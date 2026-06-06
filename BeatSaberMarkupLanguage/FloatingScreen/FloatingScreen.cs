@@ -51,7 +51,10 @@ namespace BeatSaberMarkupLanguage.FloatingScreen
 
     public class FloatingScreen : Screen
     {
+        private const float MinCurvatureRadius = 0.0001f;
+
         private static Material fogMaterial;
+        private static Material flatFogMaterial;
 
         [SerializeField]
         private GameObject handle;
@@ -138,7 +141,7 @@ namespace BeatSaberMarkupLanguage.FloatingScreen
 
         public static FloatingScreen CreateFloatingScreen(Vector2 screenSize, bool createHandle, Vector3 position, Quaternion rotation, float curvatureRadius = 0f, bool hasBackground = false)
         {
-            GameObject gameObject = new("BSMLFloatingScreen", typeof(FloatingScreen), typeof(CanvasScaler), typeof(RectMask2D), typeof(VRGraphicRaycaster), typeof(CurvedCanvasSettings))
+            GameObject gameObject = new("BSMLFloatingScreen", typeof(FloatingScreen), typeof(CanvasScaler), typeof(RectMask2D), typeof(VRGraphicRaycaster))
             {
                 layer = 5,
             };
@@ -147,8 +150,12 @@ namespace BeatSaberMarkupLanguage.FloatingScreen
 
             FloatingScreen screen = gameObject.GetComponent<FloatingScreen>();
 
-            CurvedCanvasSettings curvedCanvasSettings = screen.GetComponent<CurvedCanvasSettings>();
-            curvedCanvasSettings.SetRadius(curvatureRadius);
+            bool isCurved = curvatureRadius > MinCurvatureRadius;
+            if (isCurved)
+            {
+                CurvedCanvasSettings curvedCanvasSettings = screen.gameObject.AddComponent<CurvedCanvasSettings>();
+                curvedCanvasSettings.SetRadius(curvatureRadius);
+            }
 
             Canvas canvas = screen.GetComponent<Canvas>();
             canvas.additionalShaderChannels = AdditionalCanvasShaderChannels.TexCoord1 | AdditionalCanvasShaderChannels.TexCoord2;
@@ -172,18 +179,26 @@ namespace BeatSaberMarkupLanguage.FloatingScreen
                 rectTransform.anchorMax = Vector2.one;
                 rectTransform.offsetMin = Vector2.zero;
                 rectTransform.offsetMax = Vector2.zero;
+                rectTransform.localPosition = new Vector3(0f, 0f, isCurved ? ((Mathf.Cos((screenSize.x * 0.5f) / curvatureRadius) * curvatureRadius) - curvatureRadius) : 0f);
 
                 ImageView background = backGroundGo.GetComponent<ImageView>();
                 background.sprite = Utilities.FindSpriteCached("MainScreenMask");
                 background.type = Image.Type.Sliced;
                 background.color = new Color(0.7450981f, 0.7450981f, 0.7450981f, 1f);
+                background.raycastTarget = false;
 
                 if (fogMaterial == null)
                 {
                     fogMaterial = Resources.FindObjectsOfTypeAll<Material>().Where(x => x.name == "UIFogBG").First();
                 }
 
-                background.material = fogMaterial;
+                if (flatFogMaterial == null)
+                {
+                    flatFogMaterial = new Material(fogMaterial);
+                    flatFogMaterial.DisableKeyword("CURVED");
+                }
+
+                background.material = flatFogMaterial;
                 background.preserveAspect = true;
             }
 

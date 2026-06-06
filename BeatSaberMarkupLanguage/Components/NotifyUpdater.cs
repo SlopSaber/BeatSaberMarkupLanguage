@@ -32,6 +32,11 @@ namespace BeatSaberMarkupLanguage.Components
 
         internal bool AddAction(string propertyName, Action<object> action)
         {
+            if (notifyHost == null)
+            {
+                return false;
+            }
+
             if (actionDict.TryGetValue(propertyName, out PropertyAction notify))
             {
                 notify.AddAction(action);
@@ -56,6 +61,12 @@ namespace BeatSaberMarkupLanguage.Components
             }
 
             return true;
+        }
+
+        protected void OnDestroy()
+        {
+            NotifyHost = null;
+            actionDict.Clear();
         }
 
         private void NotifyHost_PropertyChanged(object sender, PropertyChangedEventArgs e)

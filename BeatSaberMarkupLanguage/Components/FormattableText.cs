@@ -55,6 +55,7 @@ namespace BeatSaberMarkupLanguage.Components
         {
             if (data == null)
             {
+                text = string.Empty;
                 return;
             }
 

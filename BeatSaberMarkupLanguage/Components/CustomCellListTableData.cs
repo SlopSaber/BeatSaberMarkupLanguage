@@ -9,6 +9,8 @@ namespace BeatSaberMarkupLanguage.Components
 {
     public class CustomCellListTableData : MonoBehaviour, TableView.IDataSource
     {
+        private const string ReuseIdentifier = "BSMLCustomCellListCell";
+
         [SerializeField]
         private string cellTemplate;
 
@@ -49,15 +51,29 @@ namespace BeatSaberMarkupLanguage.Components
 
         public virtual TableCell CellForIdx(TableView tableView, int idx)
         {
-            CustomCellTableCell tableCell = new GameObject().AddComponent<CustomCellTableCell>();
-            if (clickableCells)
+            CustomCellTableCell tableCell = (CustomCellTableCell)tableView.DequeueReusableCellForIdentifier(ReuseIdentifier);
+            if (tableCell == null)
             {
-                tableCell.gameObject.AddComponent<Touchable>();
-                tableCell.interactable = true;
+                tableCell = new GameObject().AddComponent<CustomCellTableCell>();
+                tableCell.reuseIdentifier = ReuseIdentifier;
+                tableCell.name = "BSMLCustomTableCell";
             }
 
-            tableCell.reuseIdentifier = "BSMLCustomCellListCell";
-            tableCell.name = "BSMLCustomTableCell";
+            tableCell.ClearContents();
+            if (clickableCells)
+            {
+                if (!tableCell.TryGetComponent(out Touchable _))
+                {
+                    tableCell.gameObject.AddComponent<Touchable>();
+                }
+
+                tableCell.interactable = true;
+            }
+            else
+            {
+                tableCell.interactable = false;
+            }
+
             tableCell.ParserParams = BSMLParser.Instance.Parse(cellTemplate, tableCell.gameObject, Data[idx]);
             tableCell.SetupPostParse();
             return tableCell;
@@ -89,9 +105,9 @@ namespace BeatSaberMarkupLanguage.Components
 
         public IList<GameObject> SelectedTags => selectedTags;
 
-        public IList<GameObject> HoveredTags => selectedTags;
+        public IList<GameObject> HoveredTags => hoveredTags;
 
-        public IList<GameObject> NeitherTags => selectedTags;
+        public IList<GameObject> NeitherTags => neitherTags;
 
         public virtual void RefreshVisuals()
         {
@@ -114,6 +130,19 @@ namespace BeatSaberMarkupLanguage.Components
             {
                 action.Invoke(selected, highlighted);
             }
+        }
+
+        internal void ClearContents()
+        {
+            for (int i = transform.childCount - 1; i >= 0; i--)
+            {
+                Destroy(transform.GetChild(i).gameObject);
+            }
+
+            ParserParams = null;
+            selectedTags = null;
+            hoveredTags = null;
+            neitherTags = null;
         }
 
         internal void SetupPostParse()

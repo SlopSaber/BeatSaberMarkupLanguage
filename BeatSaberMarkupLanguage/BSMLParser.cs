@@ -21,6 +21,7 @@ namespace BeatSaberMarkupLanguage
         internal static readonly string MacroPrefix = "macro.";
         internal static readonly string RetrieveValuePrefix = "~";
         internal static readonly string SubscribeEventActionPrefix = "#";
+        private static readonly Dictionary<Type, HostReflectionInfo> HostReflectionCache = new();
 
         private readonly Dictionary<string, BSMLTag> tags = new();
         private readonly Dictionary<string, BSMLMacro> macros = new();
@@ -131,7 +132,8 @@ namespace BeatSaberMarkupLanguage
             FieldAccessOption fieldAccessOptions = FieldAccessOption.Auto;
             PropertyAccessOption propertyAccessOptions = PropertyAccessOption.Auto;
             MethodAccessOption methodAccessOptions = MethodAccessOption.Auto;
-            HostOptionsAttribute hostOptions = host?.GetType().GetCustomAttribute<HostOptionsAttribute>();
+            HostReflectionInfo hostInfo = host != null ? GetHostReflectionInfo(host.GetType()) : null;
+            HostOptionsAttribute hostOptions = hostInfo?.HostOptions;
             if (hostOptions != null)
             {
                 fieldAccessOptions = hostOptions.FieldAccessOption;
@@ -141,13 +143,13 @@ namespace BeatSaberMarkupLanguage
 
             if (host != null)
             {
-                foreach (MethodInfo methodInfo in host.GetType().GetMethods(BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic))
+                foreach (MethodBinding methodBinding in hostInfo.Methods)
                 {
+                    MethodInfo methodInfo = methodBinding.MethodInfo;
                     string methodName = methodInfo.Name;
-                    string uiActionName = null;
-                    if (methodInfo.GetCustomAttribute<UIAction>(true) is UIAction uiaction)
+                    if (methodBinding.UIAction != null)
                     {
-                        uiActionName = uiaction.Id;
+                        string uiActionName = methodBinding.UIAction.Id;
                         if (parserParams.Actions.TryGetValue(uiActionName, out BSMLAction existing))
                         {
                             if (existing.FromUIAction)
@@ -179,13 +181,13 @@ namespace BeatSaberMarkupLanguage
 
                 // TODO: Figure out a way to prioritize [UIValue] attributes across both fields and properties.
                 // If a field has the same name as a UIValue on a property, the field will take precedence. This is usually not the expected behavior.
-                foreach (FieldInfo fieldInfo in host.GetType().GetFields(BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic))
+                foreach (FieldBinding fieldBinding in hostInfo.Fields)
                 {
+                    FieldInfo fieldInfo = fieldBinding.FieldInfo;
                     string fieldName = fieldInfo.Name;
-                    string uiValueName = null;
-                    if (fieldInfo.GetCustomAttribute<UIValue>(true) is UIValue uivalue)
+                    if (fieldBinding.UIValue != null)
                     {
-                        uiValueName = uivalue.Id;
+                        string uiValueName = fieldBinding.UIValue.Id;
                         if (parserParams.Values.TryGetValue(uiValueName, out BSMLValue existing))
                         {
                             if (existing.FromUIValue)
@@ -214,19 +216,19 @@ namespace BeatSaberMarkupLanguage
                         parserParams.Values.Add(fieldName, new BSMLFieldValue(host, fieldInfo, false));
                     }
 
-                    if (fieldInfo.GetCustomAttribute<UIParams>(true) != null)
+                    if (fieldBinding.HasUIParams)
                     {
                         fieldInfo.SetValue(host, parserParams);
                     }
                 }
 
-                foreach (PropertyInfo propertyInfo in host.GetType().GetProperties(BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic))
+                foreach (PropertyBinding propertyBinding in hostInfo.Properties)
                 {
+                    PropertyInfo propertyInfo = propertyBinding.PropertyInfo;
                     string propName = propertyInfo.Name;
-                    string uiValueName = null;
-                    if (propertyInfo.GetCustomAttribute<UIValue>(true) is UIValue uivalue)
+                    if (propertyBinding.UIValue != null)
                     {
-                        uiValueName = uivalue.Id;
+                        string uiValueName = propertyBinding.UIValue.Id;
                         if (parserParams.Values.TryGetValue(uiValueName, out BSMLValue existing))
                         {
                             if (existing.FromUIValue)
@@ -328,6 +330,17 @@ namespace BeatSaberMarkupLanguage
             return component;
         }
 
+        private static HostReflectionInfo GetHostReflectionInfo(Type hostType)
+        {
+            if (!HostReflectionCache.TryGetValue(hostType, out HostReflectionInfo hostInfo))
+            {
+                hostInfo = new HostReflectionInfo(hostType);
+                HostReflectionCache.Add(hostType, hostInfo);
+            }
+
+            return hostInfo;
+        }
+
         private void HandleTagNode(XElement element, GameObject parent, BSMLParserParams parserParams, out IEnumerable<ComponentTypeWithData> componentInfo)
         {
             if (!this.tags.TryGetValue(element.Name.LocalName, out BSMLTag currentTag))
@@ -373,32 +386,38 @@ namespace BeatSaberMarkupLanguage
             object host = parserParams.Host;
             XAttribute id = element.Attribute("id");
 
-            // TODO: iterating over fields/properties for every tag is very inefficient
             if (host != null && id != null)
             {
-                foreach (FieldInfo fieldInfo in host.GetType().GetFields(BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public))
+                HostReflectionInfo hostInfo = GetHostReflectionInfo(host.GetType());
+                foreach (FieldIdBinding fieldInfo in hostInfo.ComponentFields)
                 {
-                    if (fieldInfo.GetCustomAttribute<UIComponent>(true)?.Id == id.Value)
+                    if (fieldInfo.Id == id.Value)
                     {
-                        fieldInfo.SetValue(host, GetExternalComponent(currentNode, fieldInfo.FieldType));
-                    }
-
-                    if (fieldInfo.GetCustomAttribute<UIObject>(true)?.Id == id.Value)
-                    {
-                        fieldInfo.SetValue(host, currentNode);
+                        fieldInfo.FieldInfo.SetValue(host, GetExternalComponent(currentNode, fieldInfo.FieldInfo.FieldType));
                     }
                 }
 
-                foreach (PropertyInfo fieldInfo in host.GetType().GetProperties(BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public))
+                foreach (FieldIdBinding fieldInfo in hostInfo.ObjectFields)
                 {
-                    if (fieldInfo.GetCustomAttribute<UIComponent>(true)?.Id == id.Value)
+                    if (fieldInfo.Id == id.Value)
                     {
-                        fieldInfo.SetValue(host, GetExternalComponent(currentNode, fieldInfo.PropertyType));
+                        fieldInfo.FieldInfo.SetValue(host, currentNode);
                     }
+                }
 
-                    if (fieldInfo.GetCustomAttribute<UIObject>(true)?.Id == id.Value)
+                foreach (PropertyIdBinding propertyInfo in hostInfo.ComponentProperties)
+                {
+                    if (propertyInfo.Id == id.Value)
                     {
-                        fieldInfo.SetValue(host, currentNode);
+                        propertyInfo.PropertyInfo.SetValue(host, GetExternalComponent(currentNode, propertyInfo.PropertyInfo.PropertyType));
+                    }
+                }
+
+                foreach (PropertyIdBinding propertyInfo in hostInfo.ObjectProperties)
+                {
+                    if (propertyInfo.Id == id.Value)
+                    {
+                        propertyInfo.PropertyInfo.SetValue(host, currentNode);
                     }
                 }
             }
@@ -501,6 +520,126 @@ namespace BeatSaberMarkupLanguage
             public Component Component;
             public Dictionary<string, string> Data;
             public Dictionary<string, BSMLValue> ValueMap;
+        }
+
+        private readonly struct MethodBinding
+        {
+            internal MethodBinding(MethodInfo methodInfo)
+            {
+                MethodInfo = methodInfo;
+                UIAction = methodInfo.GetCustomAttribute<UIAction>(true);
+            }
+
+            internal MethodInfo MethodInfo { get; }
+
+            internal UIAction UIAction { get; }
+        }
+
+        private readonly struct FieldBinding
+        {
+            internal FieldBinding(FieldInfo fieldInfo)
+            {
+                FieldInfo = fieldInfo;
+                UIValue = fieldInfo.GetCustomAttribute<UIValue>(true);
+                HasUIParams = fieldInfo.GetCustomAttribute<UIParams>(true) != null;
+            }
+
+            internal FieldInfo FieldInfo { get; }
+
+            internal UIValue UIValue { get; }
+
+            internal bool HasUIParams { get; }
+        }
+
+        private readonly struct PropertyBinding
+        {
+            internal PropertyBinding(PropertyInfo propertyInfo)
+            {
+                PropertyInfo = propertyInfo;
+                UIValue = propertyInfo.GetCustomAttribute<UIValue>(true);
+            }
+
+            internal PropertyInfo PropertyInfo { get; }
+
+            internal UIValue UIValue { get; }
+        }
+
+        private readonly struct FieldIdBinding
+        {
+            internal FieldIdBinding(FieldInfo fieldInfo, string id)
+            {
+                FieldInfo = fieldInfo;
+                Id = id;
+            }
+
+            internal FieldInfo FieldInfo { get; }
+
+            internal string Id { get; }
+        }
+
+        private readonly struct PropertyIdBinding
+        {
+            internal PropertyIdBinding(PropertyInfo propertyInfo, string id)
+            {
+                PropertyInfo = propertyInfo;
+                Id = id;
+            }
+
+            internal PropertyInfo PropertyInfo { get; }
+
+            internal string Id { get; }
+        }
+
+        private sealed class HostReflectionInfo
+        {
+            internal HostReflectionInfo(Type hostType)
+            {
+                HostOptions = hostType.GetCustomAttribute<HostOptionsAttribute>();
+                Methods = hostType.GetMethods(BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic)
+                    .Select(method => new MethodBinding(method))
+                    .ToArray();
+                Fields = hostType.GetFields(BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic)
+                    .Select(field => new FieldBinding(field))
+                    .ToArray();
+                Properties = hostType.GetProperties(BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic)
+                    .Select(property => new PropertyBinding(property))
+                    .ToArray();
+
+                FieldInfo[] instanceFields = hostType.GetFields(BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
+                PropertyInfo[] instanceProperties = hostType.GetProperties(BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
+                ComponentFields = instanceFields
+                    .Select(field => new FieldIdBinding(field, field.GetCustomAttribute<UIComponent>(true)?.Id))
+                    .Where(binding => binding.Id != null)
+                    .ToArray();
+                ObjectFields = instanceFields
+                    .Select(field => new FieldIdBinding(field, field.GetCustomAttribute<UIObject>(true)?.Id))
+                    .Where(binding => binding.Id != null)
+                    .ToArray();
+                ComponentProperties = instanceProperties
+                    .Select(property => new PropertyIdBinding(property, property.GetCustomAttribute<UIComponent>(true)?.Id))
+                    .Where(binding => binding.Id != null)
+                    .ToArray();
+                ObjectProperties = instanceProperties
+                    .Select(property => new PropertyIdBinding(property, property.GetCustomAttribute<UIObject>(true)?.Id))
+                    .Where(binding => binding.Id != null)
+                    .ToArray();
+            }
+
+            internal HostOptionsAttribute HostOptions { get; }
+
+            internal MethodBinding[] Methods { get; }
+
+            internal FieldBinding[] Fields { get; }
+
+            internal PropertyBinding[] Properties { get; }
+
+            internal FieldIdBinding[] ComponentFields { get; }
+
+            internal FieldIdBinding[] ObjectFields { get; }
+
+            internal PropertyIdBinding[] ComponentProperties { get; }
+
+            internal PropertyIdBinding[] ObjectProperties { get; }
         }
     }
 }

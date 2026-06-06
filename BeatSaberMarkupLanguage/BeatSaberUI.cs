@@ -501,6 +501,11 @@ namespace BeatSaberMarkupLanguage
                 else
                 {
                     byte[] data = await Utilities.GetDataAsync(location);
+                    if (image == null)
+                    {
+                        return;
+                    }
+
                     AnimationData animationData;
 
                     if (location.EndsWith(".gif", StringComparison.OrdinalIgnoreCase) || (isURL && uri.LocalPath.EndsWith(".gif", StringComparison.OrdinalIgnoreCase)))
@@ -513,7 +518,10 @@ namespace BeatSaberMarkupLanguage
                     }
 
                     AnimationControllerData controllerData = AnimationController.Instance.Register(location, animationData);
-                    stateUpdater.ControllerData = controllerData;
+                    if (stateUpdater != null)
+                    {
+                        stateUpdater.ControllerData = controllerData;
+                    }
 
                     return;
                 }
@@ -529,6 +537,10 @@ namespace BeatSaberMarkupLanguage
                 }
 
                 byte[] data = await Utilities.GetDataAsync(location);
+                if (image == null)
+                {
+                    return;
+                }
 
                 if (stateUpdater != null)
                 {

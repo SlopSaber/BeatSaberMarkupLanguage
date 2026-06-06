@@ -1,8 +1,5 @@
 ﻿<Project>
   <PropertyGroup>
-    <!-- Normalize BeatSaberDir -->
-    <BeatSaberDir Condition="'$(BeatSaberDir)' != '' AND !($(BeatSaberDir.EndsWith('/')) OR $(BeatSaberDir.EndsWith('\')))">$(BeatSaberDir)\</BeatSaberDir>
-    
     <ManifestPath>$(IntermediateOutputPath)manifest.json</ManifestPath>
     <ManifestPath Condition="'$(BeatSaberOutputType)' == 'Library'">$(TargetDir)$(TargetName).manifest</ManifestPath>
 
@@ -28,8 +25,29 @@
   <!-- Default targets set TargetFrameworkDirectory to .NET Framework reference assemblies no matter what so we have to manually force it -->
   <Target Name="OverrideTargetFrameworkDirectory" AfterTargets="GetReferenceAssemblyPaths">
     <PropertyGroup>
-      <TargetFrameworkDirectory>$(BeatSaberDir)Beat Saber_Data\Managed\</TargetFrameworkDirectory>
+      <BeatSaberDir Condition="'$(BeatSaberDir)' == '' AND '$(BeatSaberGameDir)' != ''">$(BeatSaberGameDir)</BeatSaberDir>
+      <BeatSaberDir Condition="'$(BeatSaberDir)' != '' AND !($(BeatSaberDir.EndsWith('/')) OR $(BeatSaberDir.EndsWith('\')))">$(BeatSaberDir)\</BeatSaberDir>
+      <BeatSaberManagedDir Condition="'$(BeatSaberManagedDir)' == '' AND '$(BeatSaberDir)' != ''">$(BeatSaberDir)Beat Saber_Data\Managed\</BeatSaberManagedDir>
+      <TargetFrameworkDirectory>$(BeatSaberManagedDir)</TargetFrameworkDirectory>
+      <TargetFrameworkDirectories>$(BeatSaberManagedDir)</TargetFrameworkDirectories>
     </PropertyGroup>
+  </Target>
+
+  <Target Name="ResolveBeatSaberReferenceHintPaths" BeforeTargets="ResolveAssemblyReferences">
+    <PropertyGroup>
+      <BeatSaberDir Condition="'$(BeatSaberDir)' == '' AND '$(BeatSaberGameDir)' != ''">$(BeatSaberGameDir)</BeatSaberDir>
+      <BeatSaberDir Condition="'$(BeatSaberDir)' != '' AND !($(BeatSaberDir.EndsWith('/')) OR $(BeatSaberDir.EndsWith('\')))">$(BeatSaberDir)\</BeatSaberDir>
+      <BeatSaberManagedDir Condition="'$(BeatSaberManagedDir)' == '' AND '$(BeatSaberDir)' != ''">$(BeatSaberDir)Beat Saber_Data\Managed\</BeatSaberManagedDir>
+      <TargetFrameworkDirectory>$(BeatSaberManagedDir)</TargetFrameworkDirectory>
+      <TargetFrameworkDirectories>$(BeatSaberManagedDir)</TargetFrameworkDirectories>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <Reference Update="@(Reference)" Condition="('%(Reference.HintPath)' == '' OR !Exists('%(Reference.HintPath)')) AND Exists('$(BeatSaberManagedDir)%(Reference.Identity).dll')">
+        <HintPath>$(BeatSaberManagedDir)%(Reference.Identity).dll</HintPath>
+        <Private>False</Private>
+      </Reference>
+    </ItemGroup>
   </Target>
 
   <Target Name="GenerateManifest" BeforeTargets="BeforeBuild">

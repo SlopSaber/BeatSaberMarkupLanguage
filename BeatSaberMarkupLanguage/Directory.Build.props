@@ -1,6 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project>
   <PropertyGroup>
+    <LocalRefsDir Condition="'$(LocalRefsDir)' == '' AND Exists('$(MSBuildThisFileDirectory)..\Refs')">$(MSBuildThisFileDirectory)..\Refs</LocalRefsDir>
+    <BeatSaberDir Condition="'$(BeatSaberDir)' == '' AND '$(BeatSaberGameDir)' != ''">$(BeatSaberGameDir)</BeatSaberDir>
+    <BeatSaberDir Condition="'$(BeatSaberDir)' == ''">$(LocalRefsDir)</BeatSaberDir>
+    <BeatSaberDir Condition="'$(BeatSaberDir)' != '' AND !($(BeatSaberDir.EndsWith('/')) OR $(BeatSaberDir.EndsWith('\')))">$(BeatSaberDir)\</BeatSaberDir>
+    <BeatSaberGameDir Condition="'$(BeatSaberGameDir)' == ''">$(BeatSaberDir)</BeatSaberGameDir>
+    <BeatSaberGameDir Condition="'$(BeatSaberGameDir)' != '' AND !($(BeatSaberGameDir.EndsWith('/')) OR $(BeatSaberGameDir.EndsWith('\')))">$(BeatSaberGameDir)\</BeatSaberGameDir>
+    <BeatSaberManagedDir Condition="'$(BeatSaberManagedDir)' == '' AND '$(BeatSaberDir)' != ''">$(BeatSaberDir)Beat Saber_Data\Managed\</BeatSaberManagedDir>
+
     <AppendTargetFrameworkToOutputPath>False</AppendTargetFrameworkToOutputPath>
     <AppendPlatformToOutputPath>False</AppendPlatformToOutputPath>
     <BeatSaberOutputType>Plugin</BeatSaberOutputType>
@@ -18,6 +26,8 @@
     <MarkPackageReferencesAsExternallyResolved>False</MarkPackageReferencesAsExternallyResolved>
     <NoStdLib>True</NoStdLib>
     <TargetFramework>net472</TargetFramework>
+    <TargetFrameworkDirectory>$(BeatSaberManagedDir)</TargetFrameworkDirectory>
+    <TargetFrameworkDirectories>$(BeatSaberManagedDir)</TargetFrameworkDirectories>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(CI)' != ''">
@@ -26,7 +36,7 @@
 
   <ItemGroup>
     <Reference Include="IPA.Loader">
-      <HintPath>$(BeatSaberDir)IPA\IPA.Loader.dll</HintPath>
+      <HintPath>$(BeatSaberManagedDir)IPA.Loader.dll</HintPath>
       <Private>False</Private>
     </Reference>
 

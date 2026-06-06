@@ -201,7 +201,7 @@ namespace BeatSaberMarkupLanguage
                     throw new ParseException("Unexpected number of components");
             }
 
-            return new RectOffset(top, bottom, left, right);
+            return new RectOffset(left, right, top, bottom);
         }
 
         /// <summary>

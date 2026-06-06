@@ -8,6 +8,32 @@ namespace BeatSaberMarkupLanguage.Components
     public class Backgroundable : MonoBehaviour
     {
         private static readonly Dictionary<string, ImageView> BackgroundCache = new();
+        private static readonly Dictionary<string, string> Backgrounds = new()
+        {
+            { "round-rect-panel", "RoundRect10" },
+            { "panel-top", "RoundRect10" },
+            { "panel-fade-gradient", "RoundRect10Thin" },
+            { "panel-top-gradient", "RoundRect10" },
+            { "title-gradient", "RoundRect10" },
+        };
+
+        private static readonly Dictionary<string, string> ObjectNames = new()
+        {
+            { "round-rect-panel", "KeyboardWrapper" },
+            { "panel-top", "BG" },
+            { "panel-fade-gradient", "Background" },
+            { "panel-top-gradient", "BG" },
+            { "title-gradient", "BG" },
+        };
+
+        private static readonly Dictionary<string, string> ObjectParentNames = new()
+        {
+            { "round-rect-panel", "Wrapper" },
+            { "panel-top", "PracticeButton" },
+            { "panel-fade-gradient", "LevelListTableCell" },
+            { "panel-top-gradient", "ActionButton" },
+            { "title-gradient", "TitleViewController" },
+        };
 
         // TODO: this should be an ImageView
         [SerializeField]
@@ -18,33 +44,6 @@ namespace BeatSaberMarkupLanguage.Components
             get => background;
             set => background = value;
         }
-
-        private static Dictionary<string, string> Backgrounds => new()
-        {
-            { "round-rect-panel", "RoundRect10" },
-            { "panel-top", "RoundRect10" },
-            { "panel-fade-gradient", "RoundRect10Thin" },
-            { "panel-top-gradient", "RoundRect10" },
-            { "title-gradient", "RoundRect10" },
-        };
-
-        private static Dictionary<string, string> ObjectNames => new()
-        {
-            { "round-rect-panel", "KeyboardWrapper" },
-            { "panel-top", "BG" },
-            { "panel-fade-gradient", "Background" },
-            { "panel-top-gradient", "BG" },
-            { "title-gradient", "BG" },
-        };
-
-        private static Dictionary<string, string> ObjectParentNames => new()
-        {
-            { "round-rect-panel", "Wrapper" },
-            { "panel-top", "PracticeButton" },
-            { "panel-fade-gradient", "LevelListTableCell" },
-            { "panel-top-gradient", "ActionButton" },
-            { "title-gradient", "TitleViewController" },
-        };
 
         public void ApplyBackground(string name)
         {
@@ -58,26 +57,24 @@ namespace BeatSaberMarkupLanguage.Components
                 throw new BSMLException($"Background type '{name}' not found");
             }
 
-            try
+            if (!BackgroundCache.TryGetValue(name, out ImageView bgTemplate) || bgTemplate == null)
             {
-                if (!BackgroundCache.TryGetValue(name, out ImageView bgTemplate) || bgTemplate == null)
+                if (!bgTemplate)
                 {
-                    if (!bgTemplate)
-                    {
-                        BackgroundCache.Remove(name);
-                    }
-
-                    bgTemplate = FindTemplate(name, backgroundName);
-                    BackgroundCache.Add(name, bgTemplate);
+                    BackgroundCache.Remove(name);
                 }
 
-                background = gameObject.AddComponent(bgTemplate);
-                background.enabled = true;
+                bgTemplate = FindTemplate(name, backgroundName);
+                if (bgTemplate == null)
+                {
+                    throw new BSMLException($"Background template '{name}' with sprite '{backgroundName}' was not found");
+                }
+
+                BackgroundCache[name] = bgTemplate;
             }
-            catch
-            {
-                Logger.Log.Error($"Error loading background: '{name}'");
-            }
+
+            background = gameObject.AddComponent(bgTemplate);
+            background.enabled = true;
         }
 
         public void ApplyColor(Color color)

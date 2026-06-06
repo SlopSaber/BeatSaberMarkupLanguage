@@ -17,10 +17,12 @@ This file should not be uploaded to GitHub and is filtered out by the .gitignore
 <Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup>
     <!-- Set "YOUR OWN" Beat Saber folder here to resolve most of the dependency paths! -->
-    <BeatSaberDir>E:\Program Files (x86)\Steam\steamapps\common\Beat Saber</BeatSaberDir>
+    <BeatSaberGameDir>E:\Program Files (x86)\Steam\steamapps\common\Beat Saber</BeatSaberGameDir>
   </PropertyGroup>
 </Project>
 ```
+
+`BeatSaberDir` is still supported for existing local setup files, and the project will also fall back to a sibling `Refs` folder when present.
 
 If you plan on adding any new dependencies which are located in the Beat Saber directory, it would be nice if you edited the paths to use `$(BeatSaberDir)` in `BeatSaberMarkupLanguage.csproj`
 

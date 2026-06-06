@@ -1,7 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
 using BeatSaberMarkupLanguage.Components;
+using BeatSaberMarkupLanguage.Parser;
 using HMUI;
+using static BeatSaberMarkupLanguage.BSMLParser;
 
 namespace BeatSaberMarkupLanguage.TypeHandlers
 {
@@ -18,7 +20,7 @@ namespace BeatSaberMarkupLanguage.TypeHandlers
             { "backgroundAlpha", new[] { "bg-alpha", "background-alpha" } },
         };
 
-        public override Dictionary<string, Action<Backgroundable, string>> Setters => new()
+        public override Dictionary<string, Action<Backgroundable, string>> Setters { get; } = new()
         {
             { "background", new Action<Backgroundable, string>((component, value) => component.ApplyBackground(value)) },
             { "backgroundColor", new Action<Backgroundable, string>((component, value) => component.Background.color = Parse.Color(value, component.Background.color.a)) },
@@ -51,5 +53,41 @@ namespace BeatSaberMarkupLanguage.TypeHandlers
             },
             { "backgroundAlpha", new Action<Backgroundable, string>((component, value) => component.ApplyAlpha(Parse.Float(value))) },
         };
+
+        public override void HandleType(ComponentTypeWithData componentType, BSMLParserParams parserParams)
+        {
+            if (componentType.Component is not Backgroundable backgroundable)
+            {
+                return;
+            }
+
+            if (componentType.Data.TryGetValue("background", out string background))
+            {
+                backgroundable.ApplyBackground(background);
+            }
+
+            NotifyUpdater updater = null;
+            foreach (KeyValuePair<string, string> pair in componentType.Data)
+            {
+                if (pair.Key == "background" || !Setters.TryGetValue(pair.Key, out Action<Backgroundable, string> action))
+                {
+                    continue;
+                }
+
+                try
+                {
+                    action.Invoke(backgroundable, pair.Value);
+                }
+                catch (Exception ex)
+                {
+                    throw new TypeHandlerException(this, pair.Key, ex);
+                }
+
+                if (componentType.ValueMap.TryGetValue(pair.Key, out BSMLValue value))
+                {
+                    updater = BindValue(componentType, parserParams, value, val => action.Invoke(backgroundable, val.InvariantToString()), updater);
+                }
+            }
+        }
     }
 }

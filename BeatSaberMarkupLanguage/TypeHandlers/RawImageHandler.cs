@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using IPA.Utilities.Async;
 using UnityEngine;
 using UnityEngine.UI;
@@ -36,8 +37,12 @@ namespace BeatSaberMarkupLanguage.TypeHandlers
                 UnityMainThreadTaskScheduler.Factory.StartNew(async () =>
                 {
                     byte[] data = await Utilities.GetDataAsync(imagePath);
-                    image.texture = await Utilities.LoadImageAsync(data);
-                }).ContinueWith((task) => Logger.Log.Error($"Failed to load image '{imagePath}'\n{task.Exception}"));
+                    Texture2D texture = await Utilities.LoadImageAsync(data);
+                    if (image != null)
+                    {
+                        image.texture = texture;
+                    }
+                }).Unwrap().ContinueWith((task) => Logger.Log.Error($"Failed to load image '{imagePath}'\n{task.Exception}"), TaskContinuationOptions.OnlyOnFaulted);
             }
         }
     }
