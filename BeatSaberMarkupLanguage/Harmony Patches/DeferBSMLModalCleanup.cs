@@ -38,6 +38,14 @@ namespace BeatSaberMarkupLanguage.Harmony_Patches
                         return;
                     }
 
+                    if (__instance._previousParent == null)
+                    {
+                        // A modal can outlive its original view after being moved
+                        // beneath the screen. It has no valid owner to return to.
+                        UnityEngine.Object.Destroy(__instance.gameObject);
+                        return;
+                    }
+
                     bool animateParent = __instance._animateParentCanvas;
                     __instance._animateParentCanvas = false;
                     try
