@@ -45,9 +45,12 @@ namespace BeatSaberMarkupLanguage
 
         internal static Config Config { get; private set; }
 
+        internal static bool IsQuitting { get; private set; }
+
         [Init]
         public void Init(Conf conf, IPALogger logger)
         {
+            IsQuitting = false;
             Logger.Log = logger;
 
             try
@@ -72,6 +75,7 @@ namespace BeatSaberMarkupLanguage
         [OnExit]
         public void OnExit()
         {
+            IsQuitting = true;
         }
 
         private async Task LoadAndSetUpFontFallbacksAsync()
