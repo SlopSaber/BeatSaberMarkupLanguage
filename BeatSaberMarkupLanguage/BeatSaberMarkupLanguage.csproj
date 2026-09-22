@@ -74,9 +74,6 @@
       <Private>False</Private>
       <Publicize>True</Publicize>
     </Reference>
-    <Reference Include="Interactable">
-      <Private>False</Private>
-    </Reference>
     <Reference Include="Main">
       <Private>False</Private>
       <Publicize>True</Publicize>
