@@ -77,7 +77,7 @@
   </Target>
 
   <!-- Copy the assembly and PDB to the Beat Saber folder -->
-  <Target Name="CopyToPlugins" AfterTargets="CopyToArtifact" Condition="'$(BeatSaberDir)' != '' AND '$(CI)' == '' AND '$(NCrunch)' != '1'">
+  <Target Name="CopyToPlugins" AfterTargets="CopyToArtifact" Condition="'$(BeatSaberDir)' != '' AND '$(DisableCopyToPlugins)' != 'true' AND '$(CI)' == '' AND '$(NCrunch)' != '1'">
     <Message Text="$(MSBuildProjectName) -&gt; $(BeatSaberDir)" Importance="high" />
 
     <ItemGroup>

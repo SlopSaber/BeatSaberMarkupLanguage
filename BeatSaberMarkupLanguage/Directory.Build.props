@@ -3,7 +3,12 @@
   <PropertyGroup>
     <LocalRefsDir Condition="'$(LocalRefsDir)' == '' AND Exists('$(MSBuildThisFileDirectory)..\Refs')">$(MSBuildThisFileDirectory)..\Refs</LocalRefsDir>
     <BeatSaberDir Condition="'$(BeatSaberDir)' == '' AND '$(BeatSaberGameDir)' != ''">$(BeatSaberGameDir)</BeatSaberDir>
-    <BeatSaberDir Condition="'$(BeatSaberDir)' == ''">$(LocalRefsDir)</BeatSaberDir>
+    <BeatSaberDir Condition="'$(BeatSaberDir)' == ''">D:\BSManager\BSInstances\1.45.1</BeatSaberDir>
+    <GameDirectory>D:\BSManager\BSInstances\1.45.1</GameDirectory>
+    <BSMTProjectType>BSIPA</BSMTProjectType>
+    <CopyPDB>false</CopyPDB>
+    <DisableCopyToGame>false</DisableCopyToGame>
+    <DisableCopyToPlugins>true</DisableCopyToPlugins>
     <BeatSaberDir Condition="'$(BeatSaberDir)' != '' AND !($(BeatSaberDir.EndsWith('/')) OR $(BeatSaberDir.EndsWith('\')))">$(BeatSaberDir)\</BeatSaberDir>
     <BeatSaberGameDir Condition="'$(BeatSaberGameDir)' == ''">$(BeatSaberDir)</BeatSaberGameDir>
     <BeatSaberGameDir Condition="'$(BeatSaberGameDir)' != '' AND !($(BeatSaberGameDir.EndsWith('/')) OR $(BeatSaberGameDir.EndsWith('\')))">$(BeatSaberGameDir)\</BeatSaberGameDir>
@@ -20,7 +25,7 @@
     <GenerateDocumentationFile>True</GenerateDocumentationFile>
     <ImplicitlyExpandDesignTimeFacades>False</ImplicitlyExpandDesignTimeFacades>
     <ImplicitlyExpandNETStandardFacades>False</ImplicitlyExpandNETStandardFacades>
-    <ImportBSMTTargets>False</ImportBSMTTargets>
+    <ImportBSMTTargets>True</ImportBSMTTargets>
     <IncludeSourceRevisionInInformationalVersion>False</IncludeSourceRevisionInInformationalVersion>
     <LangVersion>12</LangVersion>
     <MarkPackageReferencesAsExternallyResolved>False</MarkPackageReferencesAsExternallyResolved>
