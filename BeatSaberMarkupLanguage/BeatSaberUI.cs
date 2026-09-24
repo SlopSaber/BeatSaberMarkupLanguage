@@ -552,8 +552,20 @@ namespace BeatSaberMarkupLanguage
                     data = await Task.Run(() => DownscaleImage(data, scaleOptions.Width, scaleOptions.Height, scaleOptions.MaintainRatio));
                 }
 
-                image.sprite = await Utilities.LoadSpriteAsync(data);
-                image.sprite.texture.wrapMode = TextureWrapMode.Clamp;
+                Sprite sprite = await Utilities.LoadSpriteAsync(data);
+                if (image == null)
+                {
+                    if (sprite != null)
+                    {
+                        Object.Destroy(sprite.texture);
+                        Object.Destroy(sprite);
+                    }
+
+                    return;
+                }
+
+                image.sprite = sprite;
+                sprite.texture.wrapMode = TextureWrapMode.Clamp;
 
                 return;
             }
