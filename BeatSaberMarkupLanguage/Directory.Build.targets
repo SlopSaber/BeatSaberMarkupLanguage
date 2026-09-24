@@ -27,7 +27,7 @@
     <PropertyGroup>
       <BeatSaberDir Condition="'$(BeatSaberDir)' == '' AND '$(BeatSaberGameDir)' != ''">$(BeatSaberGameDir)</BeatSaberDir>
       <BeatSaberDir Condition="'$(BeatSaberDir)' != '' AND !($(BeatSaberDir.EndsWith('/')) OR $(BeatSaberDir.EndsWith('\')))">$(BeatSaberDir)\</BeatSaberDir>
-      <BeatSaberManagedDir Condition="'$(BeatSaberManagedDir)' == '' AND '$(BeatSaberDir)' != ''">$(BeatSaberDir)Beat Saber_Data\Managed\</BeatSaberManagedDir>
+      <BeatSaberManagedDir Condition="'$(BeatSaberManagedDir)' == '' AND '$(BeatSaberDir)' != ''">$(BeatSaberDir)\Beat Saber_Data\Managed\</BeatSaberManagedDir>
       <TargetFrameworkDirectory>$(BeatSaberManagedDir)</TargetFrameworkDirectory>
       <TargetFrameworkDirectories>$(BeatSaberManagedDir)</TargetFrameworkDirectories>
     </PropertyGroup>
@@ -37,7 +37,7 @@
     <PropertyGroup>
       <BeatSaberDir Condition="'$(BeatSaberDir)' == '' AND '$(BeatSaberGameDir)' != ''">$(BeatSaberGameDir)</BeatSaberDir>
       <BeatSaberDir Condition="'$(BeatSaberDir)' != '' AND !($(BeatSaberDir.EndsWith('/')) OR $(BeatSaberDir.EndsWith('\')))">$(BeatSaberDir)\</BeatSaberDir>
-      <BeatSaberManagedDir Condition="'$(BeatSaberManagedDir)' == '' AND '$(BeatSaberDir)' != ''">$(BeatSaberDir)Beat Saber_Data\Managed\</BeatSaberManagedDir>
+      <BeatSaberManagedDir Condition="'$(BeatSaberManagedDir)' == '' AND '$(BeatSaberDir)' != ''">$(BeatSaberDir)\Beat Saber_Data\Managed\</BeatSaberManagedDir>
       <TargetFrameworkDirectory>$(BeatSaberManagedDir)</TargetFrameworkDirectory>
       <TargetFrameworkDirectories>$(BeatSaberManagedDir)</TargetFrameworkDirectories>
     </PropertyGroup>
@@ -50,7 +50,7 @@
     </ItemGroup>
   </Target>
 
-  <Target Name="GenerateManifest" BeforeTargets="BeforeBuild">
+  <Target Name="GenerateBSMLManifest" BeforeTargets="BSMT_StartBSIPA">
     <GenerateManifest ID="$(PackageId)" Name="$(Title)" Author="$(Authors)" Version="$(Version)" GameVersion="$(GameVersion)"
                       Description="$(Description)" Icon="$(PluginIcon)" DependsOn="@(DependsOn)" ConflictsWith="@(ConflictsWith)"
                       Files="@(RequiredFile)" LoadBefore="@(LoadBefore)" LoadAfter="@(LoadAfter)"
@@ -84,7 +84,7 @@
       <FilesToCopy Include="$(ArtifactDir)\**\*" />
     </ItemGroup>
 
-    <Copy SourceFiles="@(FilesToCopy)" DestinationFolder="$(BeatSaberDir)%(RecursiveDir)" />
+    <Copy SourceFiles="@(FilesToCopy)" DestinationFolder="$(BeatSaberDir)\%(RecursiveDir)" />
   </Target>
 
   <!-- Set GitHub Actions output variables -->
