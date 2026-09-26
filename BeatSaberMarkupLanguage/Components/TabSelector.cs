@@ -164,17 +164,22 @@ namespace BeatSaberMarkupLanguage.Components
                 index += PageCount * currentPage;
             }
 
+            Tab selectedTab = null;
+            int visibleIndex = 0;
             for (int i = 0; i < tabs.Count; i++)
             {
-                tabs[i].gameObject.SetActive(false);
+                Tab tab = tabs[i];
+                tab.gameObject.SetActive(false);
+                if (tab.IsVisible && visibleIndex++ == index)
+                {
+                    selectedTab = tab;
+                }
             }
 
-            if (index >= tabs.Where(x => x.IsVisible).Count())
+            if (selectedTab != null)
             {
-                return;
+                selectedTab.gameObject.SetActive(true);
             }
-
-            tabs.Where(x => x.IsVisible).ElementAt(index).gameObject.SetActive(true);
         }
 
         private void SetSegmentedControlTexts(List<Tab> tabs)

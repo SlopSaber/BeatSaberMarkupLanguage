@@ -104,6 +104,14 @@ namespace BeatSaberMarkupLanguage.FloatingScreen
                 Quaternion.Slerp(floatingScreen.transform.rotation, targetRotation, 5 * Time.unscaledDeltaTime));
         }
 
+        protected void OnDestroy()
+        {
+            if (material != null)
+            {
+                Destroy(material);
+            }
+        }
+
         private void UpdateMaterial()
         {
             if (floatingScreen.HighlightHandle && (isHovering || grabbingController != null))
