@@ -207,6 +207,11 @@ namespace BeatSaberMarkupLanguage.GameplaySetup
 
         private void GameplaySetupDidDeactivate(bool removedFromHierarchy, bool screenSystemDisabling)
         {
+            if (removedFromHierarchy || screenSystemDisabling || hierarchyManager._screenSystem.mainScreen.isBeingDestroyed)
+            {
+                return;
+            }
+
             tabSelector.TextSegmentedControl.SelectCellWithNumber(0);
             vanillaTab.gameObject.SetActive(true);
             modsTab.gameObject.SetActive(false);
