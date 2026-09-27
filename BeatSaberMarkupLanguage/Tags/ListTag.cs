@@ -47,6 +47,7 @@ namespace BeatSaberMarkupLanguage.Tags
             gameObject.AddComponent<ScrollRect>();
             gameObject.AddComponent(canvasTemplate);
             DiContainer.InstantiateComponent<VRGraphicRaycaster>(gameObject);
+            gameObject.AddComponent<CanvasRenderer>();
             gameObject.AddComponent<Touchable>();
             gameObject.AddComponent<EventSystemListener>();
             ScrollView scrollView = DiContainer.InstantiateComponent<BSMLScrollView>(gameObject);
