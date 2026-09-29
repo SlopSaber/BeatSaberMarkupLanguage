@@ -9,10 +9,10 @@
     <CopyPDB>false</CopyPDB>
     <DisableCopyToGame>false</DisableCopyToGame>
     <DisableCopyToPlugins>true</DisableCopyToPlugins>
-    <BeatSaberDir Condition="'$(BeatSaberDir)' != '' AND !($(BeatSaberDir.EndsWith('/')) OR $(BeatSaberDir.EndsWith('\')))">$(BeatSaberDir)\</BeatSaberDir>
+    <BeatSaberDir Condition="'$(BeatSaberDir)' != ''">$(BeatSaberDir)\</BeatSaberDir>
     <BeatSaberGameDir Condition="'$(BeatSaberGameDir)' == ''">$(BeatSaberDir)</BeatSaberGameDir>
-    <BeatSaberGameDir Condition="'$(BeatSaberGameDir)' != '' AND !($(BeatSaberGameDir.EndsWith('/')) OR $(BeatSaberGameDir.EndsWith('\')))">$(BeatSaberGameDir)\</BeatSaberGameDir>
-    <BeatSaberManagedDir Condition="'$(BeatSaberManagedDir)' == '' AND '$(BeatSaberDir)' != ''">$(BeatSaberDir)Beat Saber_Data\Managed\</BeatSaberManagedDir>
+    <BeatSaberGameDir Condition="'$(BeatSaberGameDir)' != ''">$(BeatSaberGameDir)\</BeatSaberGameDir>
+    <BeatSaberManagedDir Condition="'$(BeatSaberManagedDir)' == '' AND '$(BeatSaberDir)' != ''">$(BeatSaberDir)\Beat Saber_Data\Managed\</BeatSaberManagedDir>
 
     <AppendTargetFrameworkToOutputPath>False</AppendTargetFrameworkToOutputPath>
     <AppendPlatformToOutputPath>False</AppendPlatformToOutputPath>
@@ -33,6 +33,9 @@
     <TargetFramework>net472</TargetFramework>
     <TargetFrameworkDirectory>$(BeatSaberManagedDir)</TargetFrameworkDirectory>
     <TargetFrameworkDirectories>$(BeatSaberManagedDir)</TargetFrameworkDirectories>
+    <EnableFrameworkPathOverride>True</EnableFrameworkPathOverride>
+    <FrameworkPathOverride>$(BeatSaberManagedDir)</FrameworkPathOverride>
+    <ReferencePath>$(BeatSaberManagedDir);$(BeatSaberDir)\Libs;$(BeatSaberDir)\Plugins;$(ReferencePath)</ReferencePath>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(CI)' != ''">
