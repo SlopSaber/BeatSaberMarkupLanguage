@@ -3,8 +3,8 @@
   <PropertyGroup>
     <LocalRefsDir Condition="'$(LocalRefsDir)' == '' AND Exists('$(MSBuildThisFileDirectory)..\Refs')">$(MSBuildThisFileDirectory)..\Refs</LocalRefsDir>
     <BeatSaberDir Condition="'$(BeatSaberDir)' == '' AND '$(BeatSaberGameDir)' != ''">$(BeatSaberGameDir)</BeatSaberDir>
-    <BeatSaberDir Condition="'$(BeatSaberDir)' == ''">D:\BSManager\BSInstances\1.45.1</BeatSaberDir>
-    <GameDirectory>D:\BSManager\BSInstances\1.45.1</GameDirectory>
+    <BeatSaberDir Condition="'$(BeatSaberDir)' == ''">D:\BSManager\BSInstances\1.45.2</BeatSaberDir>
+    <GameDirectory>D:\BSManager\BSInstances\1.45.2</GameDirectory>
     <BSMTProjectType>BSIPA</BSMTProjectType>
     <CopyPDB>false</CopyPDB>
     <DisableCopyToGame>false</DisableCopyToGame>
