@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -21,7 +22,7 @@ namespace BeatSaberMarkupLanguage
         internal static readonly string MacroPrefix = "macro.";
         internal static readonly string RetrieveValuePrefix = "~";
         internal static readonly string SubscribeEventActionPrefix = "#";
-        private static readonly Dictionary<Type, HostReflectionInfo> HostReflectionCache = new();
+        private static readonly ConcurrentDictionary<Type, HostReflectionInfo> HostReflectionCache = new();
 
         private readonly Dictionary<string, BSMLTag> tags = new();
         private readonly Dictionary<string, BSMLMacro> macros = new();
@@ -116,7 +117,7 @@ namespace BeatSaberMarkupLanguage
 
         public BSMLParserParams Parse(string content, GameObject parent, object host = null)
         {
-            XDocument document = XDocument.Parse(content, LoadOptions.SetLineInfo);
+            XDocument document = MarkupPreparation.Take(content);
             return Parse(document, parent, host);
         }
 
@@ -330,15 +331,13 @@ namespace BeatSaberMarkupLanguage
             return component;
         }
 
+        internal static void PrewarmHost(Type hostType) => GetHostReflectionInfo(hostType);
+
         private static HostReflectionInfo GetHostReflectionInfo(Type hostType)
         {
-            if (!HostReflectionCache.TryGetValue(hostType, out HostReflectionInfo hostInfo))
-            {
-                hostInfo = new HostReflectionInfo(hostType);
-                HostReflectionCache.Add(hostType, hostInfo);
-            }
-
-            return hostInfo;
+            // GetOrAdd may duplicate cold preparation, but never waits on a worker's
+            // lazy initialization while a synchronous main-thread parse is in progress.
+            return HostReflectionCache.GetOrAdd(hostType, type => new HostReflectionInfo(type));
         }
 
         private void HandleTagNode(XElement element, GameObject parent, BSMLParserParams parserParams, out IEnumerable<ComponentTypeWithData> componentInfo)

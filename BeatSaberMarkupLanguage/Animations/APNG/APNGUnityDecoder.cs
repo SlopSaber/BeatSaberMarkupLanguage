@@ -13,7 +13,7 @@ namespace BeatSaberMarkupLanguage.Animations
 
         public static Task<AnimationInfo> ProcessAsync(byte[] apngData)
         {
-            return Task.Run(() => ProcessingThread(apngData));
+            return Util.BackgroundWork.Run(() => ProcessingThread(apngData));
         }
 
         private static AnimationInfo ProcessingThread(byte[] apngData)

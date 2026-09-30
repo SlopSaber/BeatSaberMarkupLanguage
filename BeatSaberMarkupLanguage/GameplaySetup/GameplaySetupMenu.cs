@@ -23,6 +23,7 @@ namespace BeatSaberMarkupLanguage.GameplaySetup
             this.Host = host;
             this.Assembly = assembly;
             this.MenuType = menuType;
+            Util.MarkupPreparation.Prewarm(assembly, resource, host?.GetType());
         }
 
         public string Resource { get; }

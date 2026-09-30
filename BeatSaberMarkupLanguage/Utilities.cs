@@ -7,7 +7,9 @@ using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using BeatSaberMarkupLanguage.Util;
 using IPA.Utilities;
+using IPA.Utilities.Async;
 using UnityEngine;
 using UnityEngine.Networking;
 using UnityEngine.UI;
@@ -48,9 +50,16 @@ namespace BeatSaberMarkupLanguage
         /// <exception cref="FileNotFoundException">Thrown if the resource specified by <paramref name="resource"/> cannot be found in <paramref name="assembly"/>.</exception>
         public static string GetResourceContent(Assembly assembly, string resource)
         {
+            if (MarkupPreparation.TryGetResource(assembly, resource, out string prepared))
+            {
+                return prepared;
+            }
+
             using Stream stream = assembly.GetManifestResourceStream(resource) ?? throw new ResourceNotFoundException(assembly, resource);
             using StreamReader reader = new(stream);
-            return reader.ReadToEnd();
+            string content = reader.ReadToEnd();
+            MarkupPreparation.PrewarmContent(content);
+            return content;
         }
 
         // yoinked from https://answers.unity.com/questions/530178/how-to-get-a-component-from-an-object-and-add-it-t.html
@@ -134,11 +143,14 @@ namespace BeatSaberMarkupLanguage
         /// <returns>A <see cref="Task{TResult}"/> representing the asynchronous operation.</returns>
         public static async Task<Texture2D> LoadTextureFromAssemblyAsync(Assembly assembly, string name)
         {
-            Stream stream = assembly.GetManifestResourceStream(name);
-
-            return stream != null
-                ? await LoadImageAsync(stream)
-                : throw new FileNotFoundException($"No embedded resource named '{name}' found in assembly '{assembly.FullName}'");
+            EnsureRunningOnMainThread();
+            (int Width, int Height, byte[] Data) decoded = await BackgroundWork.Run(() =>
+            {
+                using Stream stream = assembly.GetManifestResourceStream(name) ??
+                    throw new FileNotFoundException($"No embedded resource named '{name}' found in assembly '{assembly.FullName}'");
+                return DecodeImage(stream);
+            }).ConfigureAwait(false);
+            return await UnityMainThreadTaskScheduler.Factory.StartNew(() => CreateTexture(decoded, true, true));
         }
 
         /// <summary>
@@ -177,8 +189,13 @@ namespace BeatSaberMarkupLanguage
                 throw new ArgumentNullException(nameof(path));
             }
 
-            using FileStream fileStream = File.OpenRead(path);
-            return await LoadImageAsync(fileStream, updateMipmaps, makeNoLongerReadable);
+            EnsureRunningOnMainThread();
+            (int Width, int Height, byte[] Data) decoded = await BackgroundWork.Run(() =>
+            {
+                using FileStream fileStream = File.OpenRead(path);
+                return DecodeImage(fileStream);
+            }).ConfigureAwait(false);
+            return await UnityMainThreadTaskScheduler.Factory.StartNew(() => CreateTexture(decoded, updateMipmaps, makeNoLongerReadable));
         }
 
         /// <summary>
@@ -215,30 +232,8 @@ namespace BeatSaberMarkupLanguage
 
             EnsureRunningOnMainThread();
 
-            (int width, int height, byte[] data) = await Task.Factory.StartNew(
-                () =>
-                {
-                    using Bitmap bitmap = new(stream);
-
-                    // flip it over since Unity uses OpenGL coordinates - (0, 0) is the bottom left corner instead of the top left
-                    bitmap.RotateFlip(System.Drawing.RotateFlipType.RotateNoneFlipY);
-
-                    BitmapData bitmapData = bitmap.LockBits(new System.Drawing.Rectangle(0, 0, bitmap.Width, bitmap.Height), ImageLockMode.ReadOnly, PixelFormat.Format32bppArgb);
-                    byte[] data = new byte[bitmapData.Stride * bitmapData.Height];
-
-                    Marshal.Copy(bitmapData.Scan0, data, 0, bitmapData.Stride * bitmapData.Height);
-
-                    bitmap.UnlockBits(bitmapData);
-
-                    return (bitmap.Width, bitmap.Height, data);
-                },
-                TaskCreationOptions.LongRunning | TaskCreationOptions.DenyChildAttach);
-
-            // basically all processors are little endian these days so pixel format order is reversed
-            Texture2D texture = new(width, height, TextureFormat.BGRA32, false);
-            texture.LoadRawTextureData(data);
-            texture.Apply(updateMipmaps, makeNoLongerReadable);
-            return texture;
+            (int Width, int Height, byte[] Data) decoded = await BackgroundWork.Run(() => DecodeImage(stream)).ConfigureAwait(false);
+            return await UnityMainThreadTaskScheduler.Factory.StartNew(() => CreateTexture(decoded, updateMipmaps, makeNoLongerReadable));
         }
 
         public static async Task<Sprite> LoadSpriteAsync(byte[] data, float pixelsPerUnit = 100.0f)
@@ -269,14 +264,15 @@ namespace BeatSaberMarkupLanguage
             return memoryStream.ToArray();
         }
 
-        public static async Task<byte[]> GetResourceAsync(Assembly asm, string resourceName)
+        public static Task<byte[]> GetResourceAsync(Assembly asm, string resourceName)
         {
-            using Stream resourceStream = asm.GetManifestResourceStream(resourceName);
-            using MemoryStream memoryStream = new(new byte[resourceStream.Length], true);
-
-            await resourceStream.CopyToAsync(memoryStream);
-
-            return memoryStream.ToArray();
+            return BackgroundWork.Run(() =>
+            {
+                using Stream resourceStream = asm.GetManifestResourceStream(resourceName) ?? throw new ResourceNotFoundException(asm, resourceName);
+                using MemoryStream memoryStream = new();
+                resourceStream.CopyTo(memoryStream);
+                return memoryStream.ToArray();
+            });
         }
 
         public static IEnumerable<T> SingleEnumerable<T>(this T item)
@@ -304,20 +300,15 @@ namespace BeatSaberMarkupLanguage
             {
                 return await GetWebDataAsync(location);
             }
-            else if (File.Exists(location))
+
+            byte[] fileData = await BackgroundWork.Run(() => File.Exists(location) ? File.ReadAllBytes(location) : null);
+            if (fileData != null)
             {
-                using (FileStream fileStream = File.OpenRead(location))
-                using (MemoryStream memoryStream = new(new byte[fileStream.Length], true))
-                {
-                    await fileStream.CopyToAsync(memoryStream);
-                    return memoryStream.ToArray();
-                }
+                return fileData;
             }
-            else
-            {
-                AssemblyFromPath(location, out Assembly asm, out string newPath);
-                return await GetResourceAsync(asm, newPath);
-            }
+
+            AssemblyFromPath(location, out Assembly asm, out string newPath);
+            return await GetResourceAsync(asm, newPath);
         }
 
         internal static IEnumerable<Type> GetDescendants<T>(params object[] constructorArgs)
@@ -392,6 +383,40 @@ namespace BeatSaberMarkupLanguage
         internal static string StripHtmlTags(string str)
         {
             return HtmlTagsRegex.Replace(str, string.Empty);
+        }
+
+        private static (int Width, int Height, byte[] Data) DecodeImage(Stream stream)
+        {
+            using Bitmap bitmap = new(stream);
+            bitmap.RotateFlip(System.Drawing.RotateFlipType.RotateNoneFlipY);
+            BitmapData bitmapData = bitmap.LockBits(new System.Drawing.Rectangle(0, 0, bitmap.Width, bitmap.Height), ImageLockMode.ReadOnly, PixelFormat.Format32bppArgb);
+            try
+            {
+                byte[] data = new byte[checked(bitmapData.Stride * bitmapData.Height)];
+                Marshal.Copy(bitmapData.Scan0, data, 0, data.Length);
+                return (bitmap.Width, bitmap.Height, data);
+            }
+            finally
+            {
+                bitmap.UnlockBits(bitmapData);
+            }
+        }
+
+        private static Texture2D CreateTexture((int Width, int Height, byte[] Data) decoded, bool updateMipmaps, bool makeNoLongerReadable)
+        {
+            EnsureRunningOnMainThread();
+            Texture2D texture = new(decoded.Width, decoded.Height, TextureFormat.BGRA32, false);
+            try
+            {
+                texture.LoadRawTextureData(decoded.Data);
+                texture.Apply(updateMipmaps, makeNoLongerReadable);
+                return texture;
+            }
+            catch
+            {
+                UnityEngine.Object.Destroy(texture);
+                throw;
+            }
         }
 
         private static Task<byte[]> GetWebDataAsync(string url)

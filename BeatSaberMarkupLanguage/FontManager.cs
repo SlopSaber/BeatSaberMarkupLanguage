@@ -61,7 +61,7 @@ namespace BeatSaberMarkupLanguage
                 return SystemFontLoadTask;
             }
 
-            Task<(Dictionary<string, List<FontInfo>> Families, Dictionary<string, FontInfo> Fulls)> task = Task.Factory.StartNew(LoadSystemFonts).Unwrap();
+            Task<(Dictionary<string, List<FontInfo>> Families, Dictionary<string, FontInfo> Fulls)> task = Task.Run(LoadSystemFonts);
             SystemFontLoadTask = task.ContinueWith(
                 t =>
                 {
@@ -257,7 +257,7 @@ namespace BeatSaberMarkupLanguage
         private static async Task<(Dictionary<string, List<FontInfo>> Families, Dictionary<string, FontInfo> Fulls)> LoadSystemFonts()
         {
             // This should be on the main thread.
-            string[] paths = await UnityMainThreadTaskScheduler.Factory.StartNew(Font.GetPathsToOSFonts);
+            string[] paths = await UnityMainThreadTaskScheduler.Factory.StartNew(Font.GetPathsToOSFonts).ConfigureAwait(false);
 
             Dictionary<string, List<FontInfo>> families = new(paths.Length, StringComparer.OrdinalIgnoreCase);
             Dictionary<string, FontInfo> fullNames = new(paths.Length, StringComparer.OrdinalIgnoreCase);

@@ -17,6 +17,7 @@ namespace BeatSaberMarkupLanguage.Settings
             this.Resource = resource;
             this.Host = host;
             this.Assembly = assembly;
+            Util.MarkupPreparation.Prewarm(assembly, resource, host?.GetType());
         }
 
         public ViewController ViewController { get; private set; }

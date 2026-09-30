@@ -21,6 +21,7 @@ namespace BeatSaberMarkupLanguage.ViewControllers
             if (hotReloadAttr == null)
             {
                 ContentFilePath = null;
+                Util.MarkupPreparation.PrewarmView(GetType());
             }
             else
             {
@@ -114,6 +115,16 @@ namespace BeatSaberMarkupLanguage.ViewControllers
             }
         }
 
+        internal static string GetDefaultResourceName(Type type)
+        {
+            string ns = type.Namespace;
+            string name = type.Name;
+            string resourceNoExtension = (ns.Length > 0 ? ns + "." : string.Empty) + name;
+
+            // First we check with no extension in case DependentUpon is being used on the embedded resource
+            return type.Assembly.GetManifestResourceNames().Contains(resourceNoExtension) ? resourceNoExtension : $"{resourceNoExtension}.bsml";
+        }
+
         protected override void DidActivate(bool firstActivation, bool addedToHierarchy, bool screenSystemEnabling)
         {
             if (!string.IsNullOrEmpty(ContentFilePath))
@@ -167,16 +178,6 @@ namespace BeatSaberMarkupLanguage.ViewControllers
             }
 
             base.DidDeactivate(removedFromHierarchy, screenSystemDisabling);
-        }
-
-        private static string GetDefaultResourceName(Type type)
-        {
-            string ns = type.Namespace;
-            string name = type.Name;
-            string resourceNoExtension = (ns.Length > 0 ? ns + "." : string.Empty) + name;
-
-            // First we check with no extension in case DependentUpon is being used on the embedded resource
-            return type.Assembly.GetManifestResourceNames().Contains(resourceNoExtension) ? resourceNoExtension : $"{resourceNoExtension}.bsml";
         }
     }
 }

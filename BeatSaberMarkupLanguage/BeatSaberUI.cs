@@ -574,7 +574,7 @@ namespace BeatSaberMarkupLanguage
 
                 if (scaleOptions.ShouldScale)
                 {
-                    data = await Task.Run(() => DownscaleImage(data, scaleOptions.Width, scaleOptions.Height, scaleOptions.MaintainRatio));
+                    data = await Util.BackgroundWork.Run(() => DownscaleImage(data, scaleOptions.Width, scaleOptions.Height, scaleOptions.MaintainRatio));
                 }
 
                 Sprite sprite = await Utilities.LoadSpriteAsync(data);
@@ -628,7 +628,7 @@ namespace BeatSaberMarkupLanguage
                     newSize = new System.Drawing.Size(Math.Min(width, originalImage.Width), Math.Min(height, originalImage.Height));
                 }
 
-                System.Drawing.Bitmap resizedImage = new(newSize.Width, newSize.Height);
+                using System.Drawing.Bitmap resizedImage = new(newSize.Width, newSize.Height);
 
                 using (System.Drawing.Graphics graphics = System.Drawing.Graphics.FromImage(resizedImage))
                 {

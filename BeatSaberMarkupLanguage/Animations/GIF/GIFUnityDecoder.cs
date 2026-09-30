@@ -19,12 +19,13 @@ namespace BeatSaberMarkupLanguage.Animations
 
         public static Task<AnimationInfo> ProcessAsync(byte[] gifData)
         {
-            return Task.Run(() => ProcessingThread(gifData));
+            return Util.BackgroundWork.Run(() => ProcessingThread(gifData));
         }
 
         private static AnimationInfo ProcessingThread(byte[] gifData)
         {
-            Image gifImage = Image.FromStream(new MemoryStream(gifData));
+            using MemoryStream stream = new(gifData);
+            using Image gifImage = Image.FromStream(stream);
             FrameDimension dimension = new(gifImage.FrameDimensionsList[0]);
             int frameCount = gifImage.GetFrameCount(dimension);
 
