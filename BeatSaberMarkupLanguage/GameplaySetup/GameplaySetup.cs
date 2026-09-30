@@ -191,6 +191,17 @@ namespace BeatSaberMarkupLanguage.GameplaySetup
                 throw new ArgumentNullException(nameof(resource));
             }
 
+            // Delegate dispatch or wrappers can identify the caller as a helper assembly.
+            // Use the host's assembly only when it actually owns the requested resource.
+            if (assembly.GetManifestResourceInfo(resource) == null && host != null)
+            {
+                Assembly hostAssembly = host.GetType().Assembly;
+                if (hostAssembly.GetManifestResourceInfo(resource) != null)
+                {
+                    assembly = hostAssembly;
+                }
+            }
+
             GameplaySetupMenu menu = new(name, resource, host, assembly, menuType);
             menus.Add(menu);
 
