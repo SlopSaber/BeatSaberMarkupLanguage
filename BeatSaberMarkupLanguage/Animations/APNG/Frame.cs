@@ -103,18 +103,23 @@ namespace BeatSaberMarkupLanguage.Animations
         /// <returns>The bitmap of the frame.</returns>
         public Bitmap ToBitmap()
         {
-            // Create the bitmap
-            Bitmap b = (Bitmap)Image.FromStream(GetStream());
-
+            using MemoryStream stream = GetStream();
+            using Bitmap b = (Bitmap)Image.FromStream(stream);
             Bitmap final = new(IHDRChunk.Width, IHDRChunk.Height);
-
-            Graphics g = Graphics.FromImage(final);
-            g.CompositingMode = CompositingMode.SourceOver;
-            g.CompositingQuality = CompositingQuality.GammaCorrected;
-            g.Clear(Color.FromArgb(0x00000000));
-            g.DrawImage(b, FcTLChunk.XOffset, FcTLChunk.YOffset, FcTLChunk.Width, FcTLChunk.Height);
-
-            return final;
+            try
+            {
+                using Graphics g = Graphics.FromImage(final);
+                g.CompositingMode = CompositingMode.SourceOver;
+                g.CompositingQuality = CompositingQuality.GammaCorrected;
+                g.Clear(Color.FromArgb(0x00000000));
+                g.DrawImage(b, FcTLChunk.XOffset, FcTLChunk.YOffset, FcTLChunk.Width, FcTLChunk.Height);
+                return final;
+            }
+            catch
+            {
+                final.Dispose();
+                throw;
+            }
         }
 
         /// <summary>

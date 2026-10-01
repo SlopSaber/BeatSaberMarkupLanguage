@@ -9,7 +9,7 @@ namespace BeatSaberMarkupLanguage.Animations
 {
     public class APNGUnityDecoder
     {
-        private const float ByteInverse = 1f / 255f;
+        private const double ByteInverse = 1.0 / 255;
 
         public static Task<AnimationInfo> ProcessAsync(byte[] apngData)
         {
@@ -38,9 +38,14 @@ namespace BeatSaberMarkupLanguage.Animations
 
                     BitmapData frame = bitmap.LockBits(new Rectangle(Point.Empty, apng.ActualSize), ImageLockMode.ReadOnly, PixelFormat.Format32bppArgb);
 
-                    Marshal.Copy(frame.Scan0, frameInfo.Colors, 0, frameInfo.Colors.Length);
-
-                    bitmap.UnlockBits(frame);
+                    try
+                    {
+                        Marshal.Copy(frame.Scan0, frameInfo.Colors, 0, frameInfo.Colors.Length);
+                    }
+                    finally
+                    {
+                        bitmap.UnlockBits(frame);
+                    }
 
                     if (apngFrame.FcTLChunk.BlendOp == APNG.Chunks.BlendOps.APNGBlendOpOver && i > 0)
                     {
@@ -48,21 +53,19 @@ namespace BeatSaberMarkupLanguage.Animations
                         byte[] last = prevFrame.Colors;
                         byte[] src = frameInfo.Colors;
 
-                        for (int clri = frameInfo.Colors.Length - 1; i > 2; i -= 4)
+                        for (int alpha = frameInfo.Colors.Length - 1; alpha > 2; alpha -= 4)
                         {
-                            float srcA = src[clri - 3] * ByteInverse;
-                            float lastA = last[clri - 3] * ByteInverse;
-
-                            float blendedA = srcA + ((1 - srcA) * lastA);
-                            src[clri - 3] = (byte)Math.Round(blendedA * 255);
-
-                            for (int c = 0; c < 3; c++)
+                            double srcA = src[alpha] * ByteInverse;
+                            double lastA = last[alpha] * ByteInverse;
+                            double blendedA = srcA + ((1 - srcA) * lastA);
+                            for (int c = 1; c <= 3; c++)
                             {
-                                float srcC = src[clri - i] * ByteInverse;
-                                float lastC = last[clri - i] * ByteInverse;
-
-                                src[clri - i] = (byte)Math.Round(((srcA * srcC) + ((1 - srcA) * lastA * lastC * 255f)) / blendedA);
+                                int channel = alpha - c;
+                                src[channel] = blendedA == 0 ? (byte)0 :
+                                    (byte)Math.Round(((srcA * src[channel]) + ((1 - srcA) * lastA * last[channel])) / blendedA);
                             }
+
+                            src[alpha] = (byte)Math.Round(blendedA * 255);
                         }
                     }
 

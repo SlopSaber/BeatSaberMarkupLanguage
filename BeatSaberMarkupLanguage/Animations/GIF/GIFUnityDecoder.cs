@@ -47,7 +47,14 @@ namespace BeatSaberMarkupLanguage.Animations
                     BitmapData frame = bitmap.LockBits(rect, ImageLockMode.ReadOnly, bitmap.PixelFormat);
                     FrameInfo currentFrame = new(frame.Width, frame.Height);
 
-                    Marshal.Copy(frame.Scan0, currentFrame.Colors, 0, currentFrame.Colors.Length);
+                    try
+                    {
+                        Marshal.Copy(frame.Scan0, currentFrame.Colors, 0, currentFrame.Colors.Length);
+                    }
+                    finally
+                    {
+                        bitmap.UnlockBits(frame);
+                    }
 
                     int delayPropertyValue = BitConverter.ToInt32(delays, i * 4);
                     currentFrame.Delay = delayPropertyValue * FrameDelayToMillisecondsRatio;
