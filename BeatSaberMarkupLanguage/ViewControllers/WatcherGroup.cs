@@ -1,11 +1,10 @@
-﻿#if DEBUG
-#define HRVC_DEBUG
-#endif
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
+using BeatSaberMarkupLanguage.Util;
 using IPA.Utilities.Async;
 
 namespace BeatSaberMarkupLanguage.ViewControllers
@@ -15,7 +14,8 @@ namespace BeatSaberMarkupLanguage.ViewControllers
         private static readonly Dictionary<string, WatcherGroup> WatcherDictionary = new();
 
         private readonly TimeSpan hotReloadDelay = TimeSpan.FromSeconds(0.5f);
-        private readonly Dictionary<int, WeakReference<IHotReloadableController>> boundControllers = new();
+        private readonly Dictionary<int, Binding> boundControllers = new();
+        private CancellationTokenSource reloadCancellation;
 
         internal WatcherGroup(string directory)
         {
@@ -31,23 +31,27 @@ namespace BeatSaberMarkupLanguage.ViewControllers
 
             string Name { get; }
 
+            bool IsAlive { get; }
+
             void MarkDirty();
 
-            void Refresh(bool forceReload = false);
+            PreparedMarkup.Request CaptureReload();
+
+            void Refresh(bool forceReload = false, PreparedMarkup prepared = null);
 
             int GetInstanceID();
         }
 
         internal FileSystemWatcher Watcher { get; private set; }
 
-        internal string ContentDirectory { get; private set; }
+        internal string ContentDirectory { get; }
 
         internal bool IsReloading { get; private set; }
 
         public static bool RegisterViewController(IHotReloadableController controller)
         {
             string contentFile = controller.ContentFilePath;
-            if (string.IsNullOrEmpty(contentFile))
+            if (Plugin.IsQuitting || !controller.IsAlive || string.IsNullOrEmpty(contentFile))
             {
                 return false;
             }
@@ -65,7 +69,6 @@ namespace BeatSaberMarkupLanguage.ViewControllers
             }
 
             watcherGroup.BindController(controller);
-
             return true;
         }
 
@@ -74,111 +77,63 @@ namespace BeatSaberMarkupLanguage.ViewControllers
             string contentFile = controller.ContentFilePath;
             if (string.IsNullOrEmpty(contentFile))
             {
-#if HRVC_DEBUG
-                Logger.Log.Error($"Skipping registration for {controller.GetInstanceID()}:{controller.Name}, it has not content file defined.");
-#endif
                 return false;
             }
 
-            bool successful = false;
             string contentDirectory = Path.GetDirectoryName(contentFile);
-            if (WatcherDictionary.TryGetValue(contentDirectory, out WatcherGroup watcherGroup))
+            return WatcherDictionary.TryGetValue(contentDirectory, out WatcherGroup watcherGroup) && watcherGroup.UnbindController(controller);
+        }
+
+        internal static void Shutdown()
+        {
+            foreach (WatcherGroup group in WatcherDictionary.Values)
             {
-                successful = watcherGroup.UnbindController(controller);
-            }
-#if HRVC_DEBUG
-            else
-            {
-                Logger.Log.Warn($"Unable to get WatcherGroup for {contentDirectory}");
+                group.DestroyWatcher();
+                group.boundControllers.Clear();
             }
 
-            if (successful)
-            {
-                Logger.Log.Info($"Successfully unregistered {controller.GetInstanceID()}:{controller.Name}");
-            }
-            else
-            {
-                Logger.Log.Warn($"Failed to Unregister {controller.GetInstanceID()}:{controller.Name}");
-            }
-#endif
-            return successful;
+            WatcherDictionary.Clear();
         }
 
         internal bool BindController(IHotReloadableController controller)
         {
-            if (boundControllers.ContainsKey(controller.GetInstanceID()))
+            int instanceId = controller.GetInstanceID();
+            if (boundControllers.ContainsKey(instanceId))
             {
-#if HRVC_DEBUG
-                Logger.Log.Error($"Failed to register controller, already exists. {controller.GetInstanceID()}:{controller.Name}");
-#endif
                 return false;
             }
 
-            boundControllers.Add(controller.GetInstanceID(), new WeakReference<IHotReloadableController>(controller));
+            boundControllers.Add(instanceId, new Binding(controller));
             CreateWatcher();
             Watcher.EnableRaisingEvents = true;
-#if HRVC_DEBUG
-            Logger.Log.Info($"Registering controller {controller.GetInstanceID()}:{controller.Name}");
-#endif
             return true;
         }
 
         internal bool UnbindController(int instanceId)
         {
-#if HRVC_DEBUG
-            if (boundControllers.TryGetValue(instanceId, out WeakReference<IHotReloadableController> controllerRef))
-            {
-                if (!controllerRef.TryGetTarget(out IHotReloadableController controller))
-                {
-                    Logger.Log.Warn($"Unbinding garbage collected controller {instanceId}");
-                }
-                else
-                {
-                    Logger.Log.Info($"Unbinding existing controller {instanceId}:{controller.Name}");
-                }
-            }
-            else
-            {
-                Logger.Log.Warn($"Trying to unbind controller that isn't in the dictionary");
-            }
-#endif
-            bool remove = boundControllers.Remove(instanceId);
-
+            bool removed = boundControllers.Remove(instanceId);
             if (boundControllers.Count == 0)
             {
                 DestroyWatcher();
             }
 
-            return remove;
+            return removed;
         }
 
-        internal bool UnbindController(IHotReloadableController controller)
-        {
-            if (controller == null)
-            {
-#if HRVC_DEBUG
-                Logger.Log.Error($"Unable to unbind controller, it is null.");
-#endif
-                return false;
-            }
+        internal bool UnbindController(IHotReloadableController controller) => controller != null && UnbindController(controller.GetInstanceID());
 
-            return UnbindController(controller.GetInstanceID());
+        private static void Observe(Task task)
+        {
+            _ = task.ContinueWith(failed => Logger.Log?.Error($"Failed to dispatch hot reload\n{failed.Exception}"), TaskContinuationOptions.OnlyOnFaulted);
         }
 
         private void CreateWatcher()
         {
-            if (Watcher != null)
+            if (Watcher != null || Plugin.IsQuitting || !Directory.Exists(ContentDirectory))
             {
                 return;
             }
 
-            if (!Directory.Exists(ContentDirectory))
-            {
-                return;
-            }
-#if HRVC_DEBUG
-            Logger.Log.Debug($"Creating FileSystemWatcher for {ContentDirectory}");
-#endif
             Watcher = new FileSystemWatcher(ContentDirectory, "*.bsml")
             {
                 NotifyFilter = NotifyFilters.LastWrite,
@@ -188,81 +143,183 @@ namespace BeatSaberMarkupLanguage.ViewControllers
 
         private void DestroyWatcher()
         {
-            if (Watcher == null)
-            {
-                return;
-            }
-
-#if HRVC_DEBUG
-            Logger.Log.Debug($"Destroying FileSystemWatcher for {ContentDirectory}");
-#endif
-            Watcher.Dispose();
+            FileSystemWatcher watcher = Watcher;
             Watcher = null;
+            reloadCancellation?.Cancel();
+            if (watcher != null)
+            {
+                watcher.Changed -= OnFileWasChanged;
+                watcher.Dispose();
+            }
         }
 
         private void OnFileWasChanged(object sender, FileSystemEventArgs e)
         {
-            foreach (KeyValuePair<int, WeakReference<IHotReloadableController>> pair in boundControllers.ToArray())
+            string fullPath = e.FullPath;
+            // Watcher callbacks only dispatch immutable event data. All bindings,
+            // controller checks and queue state belong to the main thread.
+            Observe(UnityMainThreadTaskScheduler.Factory.StartNew(() => HandleChange(sender, fullPath)));
+        }
+
+        private void HandleChange(object sender, string fullPath)
+        {
+            if (Plugin.IsQuitting || !ReferenceEquals(sender, Watcher))
             {
-                if (!pair.Value.TryGetTarget(out IHotReloadableController controller))
+                return;
+            }
+
+            foreach (KeyValuePair<int, Binding> pair in boundControllers.ToArray())
+            {
+                Binding binding = pair.Value;
+                if (!binding.Controller.TryGetTarget(out IHotReloadableController controller) || !controller.IsAlive)
                 {
-#if HRVC_DEBUG
-                    Logger.Log.Debug($"Watcher_Changed: {pair.Key} has been Garbage Collected, unbinding.");
-#endif
                     UnbindController(pair.Key);
                     continue;
                 }
 
-                if (e.FullPath == Path.GetFullPath(controller.ContentFilePath))
+                if (string.Equals(fullPath, binding.FullPath, StringComparison.Ordinal))
                 {
                     controller.MarkDirty();
-                    ReloadAsync().ContinueWith((task) => Logger.Log.Error($"Failed to reload controller '{controller.Name}'\n{task.Exception}"), TaskContinuationOptions.OnlyOnFaulted);
+                    binding.Revision++;
+                    binding.Pending = true;
                 }
             }
 
-            if (boundControllers.Count == 0)
-            {
-#if HRVC_DEBUG
-                Logger.Log.Debug($"BoundControllers is empty in Watcher_Changed.");
-#endif
-                DestroyWatcher();
-            }
+            StartReloadIfNeeded();
         }
 
-        private async Task ReloadAsync()
+        private void StartReloadIfNeeded()
         {
-            if (IsReloading)
+            if (Plugin.IsQuitting || Watcher == null || IsReloading || !boundControllers.Values.Any(binding => binding.Pending))
             {
                 return;
             }
 
             IsReloading = true;
+            reloadCancellation = new CancellationTokenSource();
+            Observe(ReloadAsync(Watcher, reloadCancellation));
+        }
 
-            await Task.Delay(hotReloadDelay);
-
-            KeyValuePair<int, WeakReference<IHotReloadableController>>[] array = boundControllers.ToArray();
-            for (int i = 0; i < array.Length; i++)
+        private List<ReloadRequest> CaptureRequests(FileSystemWatcher watcher)
+        {
+            List<ReloadRequest> requests = new();
+            if (Plugin.IsQuitting || !ReferenceEquals(watcher, Watcher))
             {
-                KeyValuePair<int, WeakReference<IHotReloadableController>> pair = array[i];
-                if (!pair.Value.TryGetTarget(out IHotReloadableController controller))
+                return requests;
+            }
+
+            foreach (KeyValuePair<int, Binding> pair in boundControllers.ToArray())
+            {
+                Binding binding = pair.Value;
+                if (!binding.Controller.TryGetTarget(out IHotReloadableController controller) || !controller.IsAlive)
                 {
-#if HRVC_DEBUG
-                    Logger.Log.Debug($"{pair.Key} has been Garbage Collected, unbinding.");
-#endif
                     UnbindController(pair.Key);
                     continue;
                 }
 
-                if (controller.ContentChanged)
+                if (binding.Pending)
                 {
-#if HRVC_DEBUG
-                    Logger.Log.Debug($"{pair.Key} seems to exist and has changed content.");
-#endif
-                    await UnityMainThreadTaskScheduler.Factory.StartNew(() => controller?.Refresh());
+                    binding.Pending = false;
+                    requests.Add(new ReloadRequest(pair.Key, binding, binding.Revision, controller.CaptureReload()));
                 }
             }
 
-            IsReloading = false;
+            return requests;
+        }
+
+        private void Publish(FileSystemWatcher watcher, ReloadRequest request, PreparedMarkup prepared)
+        {
+            if (Plugin.IsQuitting || !ReferenceEquals(watcher, Watcher) ||
+                !boundControllers.TryGetValue(request.InstanceId, out Binding binding) || !ReferenceEquals(binding, request.Binding) ||
+                binding.Revision != request.Revision || !binding.Controller.TryGetTarget(out IHotReloadableController controller) || !controller.IsAlive)
+            {
+                return;
+            }
+
+            controller.Refresh(prepared: prepared);
+        }
+
+        private async Task ReloadAsync(FileSystemWatcher watcher, CancellationTokenSource cancellation)
+        {
+            CancellationToken token = cancellation.Token;
+            try
+            {
+                bool pending;
+                do
+                {
+                    await Task.Delay(hotReloadDelay, token).ConfigureAwait(false);
+                    List<ReloadRequest> requests = await UnityMainThreadTaskScheduler.Factory.StartNew(() => CaptureRequests(watcher)).ConfigureAwait(false);
+                    foreach (ReloadRequest request in requests)
+                    {
+                        PreparedMarkup.Request input = request.Input;
+                        PreparedMarkup prepared = await BackgroundWork.Run(() => PreparedMarkup.Read(input, token), token).ConfigureAwait(false);
+                        token.ThrowIfCancellationRequested();
+                        await UnityMainThreadTaskScheduler.Factory.StartNew(() => Publish(watcher, request, prepared)).ConfigureAwait(false);
+                    }
+
+                    pending = await UnityMainThreadTaskScheduler.Factory.StartNew(() =>
+                        !Plugin.IsQuitting && ReferenceEquals(watcher, Watcher) && boundControllers.Values.Any(binding => binding.Pending)).ConfigureAwait(false);
+                }
+                while (pending);
+            }
+            catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+            {
+            }
+            catch (Exception ex)
+            {
+                Logger.Log?.Error($"Failed to reload markup\n{ex}");
+            }
+            finally
+            {
+                await UnityMainThreadTaskScheduler.Factory.StartNew(() =>
+                {
+                    if (ReferenceEquals(reloadCancellation, cancellation))
+                    {
+                        reloadCancellation = null;
+                        IsReloading = false;
+                        // Changes arriving between the final check and cleanup
+                        // remain pending and start a new owned request.
+                        StartReloadIfNeeded();
+                    }
+                }).ConfigureAwait(false);
+                cancellation.Dispose();
+            }
+        }
+
+        private sealed class Binding
+        {
+            internal Binding(IHotReloadableController controller)
+            {
+                Controller = new WeakReference<IHotReloadableController>(controller);
+                FullPath = Path.GetFullPath(controller.ContentFilePath);
+            }
+
+            internal WeakReference<IHotReloadableController> Controller { get; }
+
+            internal string FullPath { get; }
+
+            internal long Revision { get; set; }
+
+            internal bool Pending { get; set; }
+        }
+
+        private sealed class ReloadRequest
+        {
+            internal ReloadRequest(int instanceId, Binding binding, long revision, PreparedMarkup.Request input)
+            {
+                InstanceId = instanceId;
+                Binding = binding;
+                Revision = revision;
+                Input = input;
+            }
+
+            internal int InstanceId { get; }
+
+            internal Binding Binding { get; }
+
+            internal long Revision { get; }
+
+            internal PreparedMarkup.Request Input { get; }
         }
     }
 }

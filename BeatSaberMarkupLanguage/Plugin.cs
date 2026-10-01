@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
@@ -48,6 +48,7 @@ namespace BeatSaberMarkupLanguage
         public void OnExit()
         {
             IsQuitting = true;
+            ViewControllers.WatcherGroup.Shutdown();
         }
     }
 }

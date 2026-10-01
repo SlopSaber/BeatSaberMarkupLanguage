@@ -58,6 +58,13 @@ namespace BeatSaberMarkupLanguage.Util
 
         internal static XDocument Take(string content)
         {
+            // A hot reload owns one document for its synchronous activation. Keep
+            // the public string Parse path and restore any outer scope afterward.
+            if (PreparedMarkup.TryTake(content, out XDocument prepared))
+            {
+                return prepared;
+            }
+
             if (content == null)
             {
                 return XDocument.Parse(content, LoadOptions.SetLineInfo);

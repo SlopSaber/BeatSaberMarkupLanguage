@@ -9,12 +9,12 @@ namespace BeatSaberMarkupLanguage.Util
     {
         private static readonly SemaphoreSlim Slots = new(2, 2);
 
-        internal static async Task<T> Run<T>(Func<T> work)
+        internal static async Task<T> Run<T>(Func<T> work, CancellationToken cancellationToken = default)
         {
-            await Slots.WaitAsync().ConfigureAwait(false);
+            await Slots.WaitAsync(cancellationToken).ConfigureAwait(false);
             try
             {
-                return await Task.Run(work).ConfigureAwait(false);
+                return await Task.Run(work, cancellationToken).ConfigureAwait(false);
             }
             finally
             {

@@ -1,4 +1,4 @@
-﻿#if DEBUG
+#if DEBUG
 #define HRVC_DEBUG
 #endif
 using System;
@@ -6,6 +6,7 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using BeatSaberMarkupLanguage.Attributes;
+using BeatSaberMarkupLanguage.Util;
 
 namespace BeatSaberMarkupLanguage.ViewControllers
 {
@@ -13,6 +14,8 @@ namespace BeatSaberMarkupLanguage.ViewControllers
     {
         private string resourceName;
         private string content;
+        private PreparedMarkup reloadContent;
+        private bool refreshing;
 
         protected BSMLAutomaticViewController()
             : base()
@@ -33,6 +36,11 @@ namespace BeatSaberMarkupLanguage.ViewControllers
         {
             get
             {
+                if (reloadContent != null)
+                {
+                    return reloadContent.GetContent();
+                }
+
                 if (resourceName == null)
                 {
                     ViewDefinitionAttribute viewDef = GetType().GetCustomAttribute<ViewDefinitionAttribute>();
@@ -84,15 +92,20 @@ namespace BeatSaberMarkupLanguage.ViewControllers
 
         string WatcherGroup.IHotReloadableController.Name => name;
 
+        bool WatcherGroup.IHotReloadableController.IsAlive => this;
+
+        PreparedMarkup.Request WatcherGroup.IHotReloadableController.CaptureReload() => new(Path.GetFullPath(ContentFilePath), GetType(), resourceName);
+
         void WatcherGroup.IHotReloadableController.MarkDirty()
         {
             ContentChanged = true;
             content = null;
+            reloadContent = null;
         }
 
-        void WatcherGroup.IHotReloadableController.Refresh(bool forceReload)
+        void WatcherGroup.IHotReloadableController.Refresh(bool forceReload, PreparedMarkup prepared)
         {
-            if (!isActiveAndEnabled)
+            if (!this || Plugin.IsQuitting || !isActivated || !isActiveAndEnabled)
             {
 #if HRVC_DEBUG
                 Logger.Log.Warn($"Trying to refresh {GetInstanceID()}:{name} when it isn't ActiveAndEnabled.");
@@ -104,13 +117,34 @@ namespace BeatSaberMarkupLanguage.ViewControllers
             {
                 try
                 {
+                    refreshing = true;
                     __Deactivate(false, false, false);
                     ClearContents();
-                    __Activate(false, false);
+                    content = prepared?.Content;
+                    reloadContent = prepared;
+                    if (prepared?.FileError != null)
+                    {
+                        Logger.Log?.Warn($"Unable to read file {ContentFilePath} for {name}: {prepared.FileError.Message}");
+                        Logger.Log?.Debug(prepared.FileError);
+                    }
+
+                    using (prepared?.Use())
+                    {
+                        __Activate(false, false);
+                    }
                 }
                 catch (Exception ex)
                 {
                     Logger.Log?.Error(ex);
+                }
+                finally
+                {
+                    reloadContent = null;
+                    refreshing = false;
+                    if (!this || !isActivated || !isActiveAndEnabled)
+                    {
+                        WatcherGroup.UnregisterViewController(this);
+                    }
                 }
             }
         }
@@ -143,7 +177,7 @@ namespace BeatSaberMarkupLanguage.ViewControllers
                     ParseWithFallback();
                 }
 
-                bool registered = WatcherGroup.RegisterViewController(this);
+                bool registered = refreshing || WatcherGroup.RegisterViewController(this);
 #if HRVC_DEBUG
                 if (registered)
                 {
@@ -166,10 +200,11 @@ namespace BeatSaberMarkupLanguage.ViewControllers
             if (!string.IsNullOrEmpty(ContentFilePath))
             {
                 content = null;
+                reloadContent = null;
 #if HRVC_DEBUG
                 Logger.Log.Notice($"DidDeactivate: {GetInstanceID()}:{name}");
 #endif
-                if (!WatcherGroup.UnregisterViewController(this))
+                if (!refreshing && !WatcherGroup.UnregisterViewController(this))
                 {
 #if HRVC_DEBUG
                     Logger.Log.Warn($"Failed to Unregister {GetInstanceID()}:{name}");
@@ -178,6 +213,18 @@ namespace BeatSaberMarkupLanguage.ViewControllers
             }
 
             base.DidDeactivate(removedFromHierarchy, screenSystemDisabling);
+        }
+
+        protected override void OnDestroy()
+        {
+            content = null;
+            reloadContent = null;
+            if (!string.IsNullOrEmpty(ContentFilePath))
+            {
+                WatcherGroup.UnregisterViewController(this);
+            }
+
+            base.OnDestroy();
         }
     }
 }
