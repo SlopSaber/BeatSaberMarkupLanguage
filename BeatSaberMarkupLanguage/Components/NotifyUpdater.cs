@@ -2,6 +2,9 @@
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Reflection;
+using System.Threading.Tasks;
+using IPA.Utilities;
+using IPA.Utilities.Async;
 using UnityEngine;
 
 namespace BeatSaberMarkupLanguage.Components
@@ -10,6 +13,8 @@ namespace BeatSaberMarkupLanguage.Components
     {
         private readonly Dictionary<string, PropertyAction> actionDict = new();
         private INotifyPropertyChanged notifyHost;
+        private PropertyChangedEventHandler notifyHandler;
+        private int notifyRevision;
 
         internal INotifyPropertyChanged NotifyHost
         {
@@ -18,14 +23,18 @@ namespace BeatSaberMarkupLanguage.Components
             {
                 if (notifyHost != null)
                 {
-                    this.notifyHost.PropertyChanged -= NotifyHost_PropertyChanged;
+                    this.notifyHost.PropertyChanged -= notifyHandler;
                 }
 
                 notifyHost = value;
+                notifyHandler = null;
+                int revision = ++notifyRevision;
 
                 if (notifyHost != null)
                 {
-                    this.notifyHost.PropertyChanged += NotifyHost_PropertyChanged;
+                    INotifyPropertyChanged host = notifyHost;
+                    notifyHandler = (sender, args) => NotifyHost_PropertyChanged(host, revision, sender, args.PropertyName);
+                    host.PropertyChanged += notifyHandler;
                 }
             }
         }
@@ -69,23 +78,35 @@ namespace BeatSaberMarkupLanguage.Components
             actionDict.Clear();
         }
 
-        private void NotifyHost_PropertyChanged(object sender, PropertyChangedEventArgs e)
+        private void NotifyHost_PropertyChanged(INotifyPropertyChanged host, int revision, object sender, string propertyName)
         {
-            if (this == null)
+            if (UnityGame.OnMainThread)
             {
-                this.notifyHost.PropertyChanged -= NotifyHost_PropertyChanged;
+                ApplyPropertyChanged(host, revision, sender, propertyName);
+                return;
+            }
+
+            UnityMainThreadTaskScheduler.Factory.StartNew(() => ApplyPropertyChanged(host, revision, sender, propertyName))
+                .ContinueWith(task => Logger.Log.Error($"Failed to apply property notification\n{task.Exception}"), TaskContinuationOptions.OnlyOnFaulted);
+        }
+
+        private void ApplyPropertyChanged(INotifyPropertyChanged host, int revision, object sender, string propertyName)
+        {
+            Utilities.EnsureRunningOnMainThread();
+            if (Plugin.IsQuitting || this == null || revision != notifyRevision || !ReferenceEquals(host, notifyHost))
+            {
                 return;
             }
 
             // https://learn.microsoft.com/en-us/dotnet/api/system.componentmodel.propertychangedeventargs.propertyname?view=netframework-4.7.2#remarks
-            if (string.IsNullOrEmpty(e.PropertyName))
+            if (string.IsNullOrEmpty(propertyName))
             {
                 foreach (PropertyAction propertyAction in actionDict.Values)
                 {
                     propertyAction.Invoke(sender);
                 }
             }
-            else if (actionDict.TryGetValue(e.PropertyName, out PropertyAction propertyAction))
+            else if (actionDict.TryGetValue(propertyName, out PropertyAction propertyAction))
             {
                 propertyAction.Invoke(sender);
             }
