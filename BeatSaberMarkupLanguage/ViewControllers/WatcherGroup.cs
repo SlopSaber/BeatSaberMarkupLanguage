@@ -156,6 +156,7 @@ namespace BeatSaberMarkupLanguage.ViewControllers
         private void OnFileWasChanged(object sender, FileSystemEventArgs e)
         {
             string fullPath = e.FullPath;
+
             // Watcher callbacks only dispatch immutable event data. All bindings,
             // controller checks and queue state belong to the main thread.
             Observe(UnityMainThreadTaskScheduler.Factory.StartNew(() => HandleChange(sender, fullPath)));
@@ -277,6 +278,7 @@ namespace BeatSaberMarkupLanguage.ViewControllers
                     {
                         reloadCancellation = null;
                         IsReloading = false;
+
                         // Changes arriving between the final check and cleanup
                         // remain pending and start a new owned request.
                         StartReloadIfNeeded();

@@ -34,6 +34,7 @@ namespace BeatSaberMarkupLanguage.Util
                     ViewDefinitionAttribute definition = request.HostType.GetCustomAttribute<ViewDefinitionAttribute>();
                     resource = definition != null ? definition.Definition : ViewControllers.BSMLAutomaticViewController.GetDefaultResourceName(request.HostType);
                 }
+
                 if (File.Exists(request.FilePath))
                 {
                     try
@@ -62,7 +63,7 @@ namespace BeatSaberMarkupLanguage.Util
                     }
                 }
             }
-            catch (Exception ex) when (!(ex is OperationCanceledException))
+            catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 prepared.contentError = ex;
             }
@@ -88,7 +89,7 @@ namespace BeatSaberMarkupLanguage.Util
         {
             PreparedMarkup prepared = current;
             document = null;
-            if (prepared == null || prepared.consumed || !string.Equals(prepared.Content, content, StringComparison.Ordinal))
+            if (prepared == null || prepared.contentError != null || prepared.consumed || !string.Equals(prepared.Content, content, StringComparison.Ordinal))
             {
                 return false;
             }
