@@ -23,6 +23,7 @@ namespace BeatSaberMarkupLanguage
         internal static readonly string RetrieveValuePrefix = "~";
         internal static readonly string SubscribeEventActionPrefix = "#";
         private static readonly ConcurrentDictionary<Type, HostReflectionInfo> HostReflectionCache = new();
+        private static readonly Type[] BindingAttributes = [typeof(UIAction), typeof(UIValue), typeof(UIParams), typeof(UIComponent), typeof(UIObject)];
 
         private readonly Dictionary<string, BSMLTag> tags = new();
         private readonly Dictionary<string, BSMLMacro> macros = new();
@@ -331,7 +332,26 @@ namespace BeatSaberMarkupLanguage
             return component;
         }
 
-        internal static void PrewarmHost(Type hostType) => GetHostReflectionInfo(hostType);
+        internal static void PrewarmHost(Type hostType)
+        {
+            // Derived binding attributes may execute arbitrary constructors. Read
+            // their metadata without instantiating them and keep those hosts cold.
+            for (Type type = hostType; type != null; type = type.BaseType)
+            {
+                foreach (MemberInfo member in type.GetMembers(BindingFlags.DeclaredOnly | BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic))
+                {
+                    foreach (CustomAttributeData attribute in member.GetCustomAttributesData())
+                    {
+                        if (BindingAttributes.Any(known => attribute.AttributeType != known && known.IsAssignableFrom(attribute.AttributeType)))
+                        {
+                            return;
+                        }
+                    }
+                }
+            }
+
+            GetHostReflectionInfo(hostType);
+        }
 
         private static HostReflectionInfo GetHostReflectionInfo(Type hostType)
         {
