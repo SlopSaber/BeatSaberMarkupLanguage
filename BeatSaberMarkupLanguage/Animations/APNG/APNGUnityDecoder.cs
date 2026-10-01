@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Imaging;
+using System.IO;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 
@@ -18,8 +19,10 @@ namespace BeatSaberMarkupLanguage.Animations
 
         private static AnimationInfo ProcessingThread(byte[] apngData)
         {
-            APNG.APNG apng = APNG.APNG.FromStream(new System.IO.MemoryStream(apngData));
+            using MemoryStream stream = new(apngData, false);
+            APNG.APNG apng = APNG.APNG.FromStream(stream);
             int frameCount = apng.FrameCount;
+            Frame[] sourceFrames = apng.Frames;
 
             List<FrameInfo> frames = new(frameCount);
 
@@ -27,7 +30,7 @@ namespace BeatSaberMarkupLanguage.Animations
 
             for (int i = 0; i < frameCount; i++)
             {
-                Frame apngFrame = apng.Frames[i];
+                Frame apngFrame = sourceFrames[i];
 
                 using (Bitmap bitmap = apngFrame.ToBitmap())
                 {

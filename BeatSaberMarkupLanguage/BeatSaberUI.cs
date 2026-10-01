@@ -491,6 +491,10 @@ namespace BeatSaberMarkupLanguage
         public static async Task SetImageAsync(this Image image, string location, bool loadingAnimation = true, ScaleOptions scaleOptions = default)
         {
             Utilities.EnsureRunningOnMainThread();
+            if (Plugin.IsQuitting)
+            {
+                return;
+            }
 
             if (image.TryGetComponent(out AnimationStateUpdater oldStateUpdater))
             {
@@ -526,7 +530,7 @@ namespace BeatSaberMarkupLanguage
                 else
                 {
                     byte[] data = await Utilities.GetDataAsync(location);
-                    if (image == null)
+                    if (!IsCurrentImageRequest(image, stateUpdater))
                     {
                         return;
                     }
@@ -542,12 +546,13 @@ namespace BeatSaberMarkupLanguage
                         animationData = await AnimationLoader.ProcessApngAsync(data);
                     }
 
-                    AnimationControllerData controllerData = AnimationController.Instance.Register(location, animationData);
-                    if (stateUpdater != null)
+                    if (!IsCurrentImageRequest(image, stateUpdater))
                     {
-                        stateUpdater.ControllerData = controllerData;
+                        Object.Destroy(animationData.Atlas);
+                        return;
                     }
 
+                    stateUpdater.ControllerData = AnimationController.Instance.Register(location, animationData);
                     return;
                 }
             }
@@ -562,23 +567,22 @@ namespace BeatSaberMarkupLanguage
                 }
 
                 byte[] data = await Utilities.GetDataAsync(location);
-                if (image == null)
+                if (!IsCurrentImageRequest(image, stateUpdater))
                 {
                     return;
-                }
-
-                if (stateUpdater != null)
-                {
-                    Object.DestroyImmediate(stateUpdater);
                 }
 
                 if (scaleOptions.ShouldScale)
                 {
                     data = await Util.BackgroundWork.Run(() => DownscaleImage(data, scaleOptions.Width, scaleOptions.Height, scaleOptions.MaintainRatio));
+                    if (!IsCurrentImageRequest(image, stateUpdater))
+                    {
+                        return;
+                    }
                 }
 
                 Sprite sprite = await Utilities.LoadSpriteAsync(data);
-                if (image == null)
+                if (!IsCurrentImageRequest(image, stateUpdater))
                 {
                     if (sprite != null)
                     {
@@ -589,6 +593,7 @@ namespace BeatSaberMarkupLanguage
                     return;
                 }
 
+                Object.DestroyImmediate(stateUpdater);
                 image.sprite = sprite;
                 sprite.texture.wrapMode = TextureWrapMode.Clamp;
 
@@ -610,7 +615,7 @@ namespace BeatSaberMarkupLanguage
             {
                 // this memory stream needs to stay open or else GDI+ dies
                 using MemoryStream workMemoryStream = new(data);
-                System.Drawing.Image originalImage = System.Drawing.Image.FromStream(workMemoryStream);
+                using System.Drawing.Image originalImage = System.Drawing.Image.FromStream(workMemoryStream);
 
                 if (originalImage.Width <= width && originalImage.Height <= height)
                 {
@@ -801,6 +806,12 @@ namespace BeatSaberMarkupLanguage
             // default bold spacing is rather  w i d e
             // 2 seems to match the spacing of the MISS text in-game
             fontAsset.boldSpacing = 2f;
+        }
+
+        private static bool IsCurrentImageRequest(Image image, AnimationStateUpdater stateUpdater)
+        {
+            Utilities.EnsureRunningOnMainThread();
+            return !Plugin.IsQuitting && image != null && stateUpdater != null && ReferenceEquals(stateUpdater.Image, image);
         }
 
         public struct ScaleOptions
