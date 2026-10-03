@@ -1,14 +1,19 @@
-﻿using System;
+using System;
 using System.Reflection;
 using BeatSaberMarkupLanguage.Attributes;
 using BeatSaberMarkupLanguage.Components;
+using BeatSaberMarkupLanguage.Util;
 using UnityEngine;
 
 namespace BeatSaberMarkupLanguage.GameplaySetup
 {
     internal class GameplaySetupMenu
     {
-        private const string ErrorViewResourcePath = "BeatSaberMarkupLanguage.Views.gameplay-tab-error.bsml";
+        internal const string ErrorViewResourcePath = "BeatSaberMarkupLanguage.Views.gameplay-tab-error.bsml";
+
+        private PreparedMarkup preparedContent;
+        private PreparedMarkup preparedError;
+        private Func<bool> isCurrent;
 
         [UIObject("root-tab")]
         private GameObject tabObject;
@@ -23,7 +28,6 @@ namespace BeatSaberMarkupLanguage.GameplaySetup
             this.Host = host;
             this.Assembly = assembly;
             this.MenuType = menuType;
-            Util.MarkupPreparation.Prewarm(assembly, resource, host?.GetType());
         }
 
         public string Resource { get; }
@@ -56,25 +60,65 @@ namespace BeatSaberMarkupLanguage.GameplaySetup
         [UIAction("#post-parse")]
         public void Setup()
         {
+            CheckCurrent();
             try
             {
-                BSMLParser.Instance.Parse(Utilities.GetResourceContent(Assembly, Resource), tabObject, Host);
+                using IDisposable scope = preparedContent?.Use();
+                string content = preparedContent != null ? preparedContent.GetContent() : Utilities.GetResourceContent(Assembly, Resource);
+                BSMLParser.Instance.Parse(content, tabObject, Host);
+                CheckCurrent();
             }
             catch (Exception ex)
             {
+                CheckCurrent();
                 Logger.Log.Error($"Error adding gameplay settings tab for {Assembly?.GetName().Name ?? "<NULL>"} ({Name})\n{ex}");
-                BSMLParser.Instance.Parse(Utilities.GetResourceContent(Assembly.GetExecutingAssembly(), ErrorViewResourcePath), tabObject);
+                CheckCurrent();
+                using IDisposable scope = preparedError?.Use();
+                string content = preparedError != null ? preparedError.GetContent() : Utilities.GetResourceContent(Assembly.GetExecutingAssembly(), ErrorViewResourcePath);
+                BSMLParser.Instance.Parse(content, tabObject);
+                CheckCurrent();
             }
+        }
+
+        internal void Prepare(PreparedMarkup content, PreparedMarkup error, Func<bool> current)
+        {
+            preparedContent = content;
+            preparedError = error;
+            isCurrent = current;
+        }
+
+        internal void ClearPreparation()
+        {
+            preparedContent = null;
+            preparedError = null;
+            isCurrent = null;
+        }
+
+        internal void RetireView()
+        {
+            tabObject = null;
+            tab = null;
         }
 
         public void SetVisible(bool isVisible)
         {
-            tab.IsVisible = Visible && isVisible;
+            if (tab != null)
+            {
+                tab.IsVisible = Visible && isVisible;
+            }
         }
 
         public bool IsMenuType(MenuType toCheck)
         {
             return (MenuType & toCheck) == toCheck;
+        }
+
+        private void CheckCurrent()
+        {
+            if (isCurrent != null && (!isCurrent() || tabObject == null))
+            {
+                throw new OperationCanceledException();
+            }
         }
     }
 }

@@ -85,6 +85,57 @@ namespace BeatSaberMarkupLanguage.Util
             return prepared;
         }
 
+        internal static PreparedMarkup ReadResource(ResourceRequest request, CancellationToken cancellationToken)
+        {
+            PreparedMarkup prepared = new();
+            try
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (MarkupPreparation.TryGetResource(request.Assembly, request.ResourceName, out string cached))
+                {
+                    prepared.Content = cached;
+                }
+                else
+                {
+                    using Stream stream = request.Assembly.GetManifestResourceStream(request.ResourceName) ?? throw new ResourceNotFoundException(request.Assembly, request.ResourceName);
+                    using StreamReader reader = new(stream);
+                    prepared.Content = reader.ReadToEnd();
+                }
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                prepared.contentError = ex;
+            }
+
+            cancellationToken.ThrowIfCancellationRequested();
+            if (prepared.contentError == null)
+            {
+                try
+                {
+                    prepared.document = XDocument.Parse(prepared.Content, LoadOptions.SetLineInfo);
+                }
+                catch (Exception ex)
+                {
+                    prepared.parseError = ex;
+                }
+            }
+
+            if (request.HostType != null)
+            {
+                try
+                {
+                    BSMLParser.PrewarmHost(request.HostType);
+                }
+                catch
+                {
+                    // Optional reflection preparation must not move binding failures.
+                }
+            }
+
+            cancellationToken.ThrowIfCancellationRequested();
+            return prepared;
+        }
+
         internal static bool TryTake(string content, out XDocument document)
         {
             PreparedMarkup prepared = current;
@@ -131,6 +182,28 @@ namespace BeatSaberMarkupLanguage.Util
             internal Type HostType { get; }
 
             internal string ResourceName { get; }
+        }
+
+        internal sealed class ResourceRequest
+        {
+            private ResourceRequest(Assembly assembly, string resourceName, Type hostType)
+            {
+                Assembly = assembly;
+                ResourceName = resourceName;
+                HostType = hostType;
+            }
+
+            internal Assembly Assembly { get; }
+
+            internal string ResourceName { get; }
+
+            internal Type HostType { get; }
+
+            internal static ResourceRequest Capture(Assembly assembly, string resourceName, Type hostType)
+            {
+                // Assembly subclasses can implement arbitrary resource providers.
+                return assembly?.GetType() == typeof(PreparedMarkup).Assembly.GetType() ? new(assembly, resourceName, hostType) : null;
+            }
         }
 
         private sealed class Scope : IDisposable
