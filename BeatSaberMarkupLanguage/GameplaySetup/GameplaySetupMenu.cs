@@ -80,6 +80,19 @@ namespace BeatSaberMarkupLanguage.GameplaySetup
             }
         }
 
+        public void SetVisible(bool isVisible)
+        {
+            if (tab != null)
+            {
+                tab.IsVisible = Visible && isVisible;
+            }
+        }
+
+        public bool IsMenuType(MenuType toCheck)
+        {
+            return (MenuType & toCheck) == toCheck;
+        }
+
         internal void Prepare(PreparedMarkup content, PreparedMarkup error, Func<bool> current)
         {
             preparedContent = content;
@@ -98,19 +111,6 @@ namespace BeatSaberMarkupLanguage.GameplaySetup
         {
             tabObject = null;
             tab = null;
-        }
-
-        public void SetVisible(bool isVisible)
-        {
-            if (tab != null)
-            {
-                tab.IsVisible = Visible && isVisible;
-            }
-        }
-
-        public bool IsMenuType(MenuType toCheck)
-        {
-            return (MenuType & toCheck) == toCheck;
         }
 
         private void CheckCurrent()

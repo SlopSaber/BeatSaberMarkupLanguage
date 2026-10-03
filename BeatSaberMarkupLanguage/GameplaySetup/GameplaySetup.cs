@@ -23,10 +23,11 @@ namespace BeatSaberMarkupLanguage.GameplaySetup
         private readonly MainFlowCoordinator mainFlowCoordinator;
         private readonly GameplaySetupViewController gameplaySetupViewController;
         private readonly HierarchyManager hierarchyManager;
+        private readonly CancellationTokenSource lifetimeCancellation = new();
+        private readonly SortedList<GameplaySetupMenu> menus = new(Comparer<GameplaySetupMenu>.Create((a, b) => a.Name.CompareTo(b.Name)));
 
         private Task debounceTask;
         private Task<PreparedMarkup[]> preparationTask;
-        private readonly CancellationTokenSource lifetimeCancellation = new();
         private long revision;
         private bool initialized;
         private bool disposed;
@@ -54,8 +55,6 @@ namespace BeatSaberMarkupLanguage.GameplaySetup
 
         [UIValue("vanilla-items")]
         private List<Transform> vanillaItems = [];
-
-        private SortedList<GameplaySetupMenu> menus = new(Comparer<GameplaySetupMenu>.Create((a, b) => a.Name.CompareTo(b.Name)));
 
         private GameplaySetup(MainFlowCoordinator mainFlowCoordinator, GameplaySetupViewController gameplaySetupViewController, HierarchyManager hierarchyManager)
         {
@@ -117,6 +116,61 @@ namespace BeatSaberMarkupLanguage.GameplaySetup
             return CreateCell(idx, null, null);
         }
 
+        /// <inheritdoc />
+        public void Initialize()
+        {
+            initialized = true;
+            foreach (Transform transform in gameplaySetupViewController.transform)
+            {
+                if (transform.name != "HeaderPanel")
+                {
+                    vanillaItems.Add(transform);
+                }
+            }
+
+            QueueRefreshView();
+
+            gameplaySetupViewController.didActivateEvent += GameplaySetupDidActivate;
+            gameplaySetupViewController.didDeactivateEvent += GameplaySetupDidDeactivate;
+        }
+
+        /// <inheritdoc />
+        public void Dispose()
+        {
+            if (disposed)
+            {
+                return;
+            }
+
+            disposed = true;
+            revision++;
+            lifetimeCancellation.Cancel();
+            gameplaySetupViewController.didActivateEvent -= GameplaySetupDidActivate;
+            gameplaySetupViewController.didDeactivateEvent -= GameplaySetupDidDeactivate;
+            RetireView();
+
+            if (debounceTask == null)
+            {
+                lifetimeCancellation.Dispose();
+            }
+        }
+
+        private static Task<PreparedMarkup[]> PrepareMarkupAsync(PreparedMarkup.ResourceRequest[] requests, CancellationToken cancellationToken)
+        {
+            return BackgroundWork.Run(
+                () =>
+                {
+                    PreparedMarkup[] prepared = new PreparedMarkup[requests.Length];
+                    for (int i = 0; i < requests.Length; i++)
+                    {
+                        prepared[i] = PreparedMarkup.ReadResource(requests[i], cancellationToken);
+                    }
+
+                    return prepared;
+                },
+                cancellationToken);
+        }
+
         private TableCell CreateCell(int idx, GameplaySetupMenu menu, MenuDataSource source)
         {
             long cellRevision = revision;
@@ -156,45 +210,6 @@ namespace BeatSaberMarkupLanguage.GameplaySetup
                 }
 
                 throw;
-            }
-        }
-
-        /// <inheritdoc />
-        public void Initialize()
-        {
-            initialized = true;
-            foreach (Transform transform in gameplaySetupViewController.transform)
-            {
-                if (transform.name != "HeaderPanel")
-                {
-                    vanillaItems.Add(transform);
-                }
-            }
-
-            QueueRefreshView();
-
-            gameplaySetupViewController.didActivateEvent += GameplaySetupDidActivate;
-            gameplaySetupViewController.didDeactivateEvent += GameplaySetupDidDeactivate;
-        }
-
-        /// <inheritdoc />
-        public void Dispose()
-        {
-            if (disposed)
-            {
-                return;
-            }
-
-            disposed = true;
-            revision++;
-            lifetimeCancellation.Cancel();
-            gameplaySetupViewController.didActivateEvent -= GameplaySetupDidActivate;
-            gameplaySetupViewController.didDeactivateEvent -= GameplaySetupDidDeactivate;
-            RetireView();
-
-            if (debounceTask == null)
-            {
-                lifetimeCancellation.Dispose();
             }
         }
 
@@ -349,20 +364,6 @@ namespace BeatSaberMarkupLanguage.GameplaySetup
                     QueueRefreshView();
                 }
             }
-        }
-
-        private static Task<PreparedMarkup[]> PrepareMarkupAsync(PreparedMarkup.ResourceRequest[] requests, CancellationToken cancellationToken)
-        {
-            return BackgroundWork.Run(() =>
-            {
-                PreparedMarkup[] prepared = new PreparedMarkup[requests.Length];
-                for (int i = 0; i < requests.Length; i++)
-                {
-                    prepared[i] = PreparedMarkup.ReadResource(requests[i], cancellationToken);
-                }
-
-                return prepared;
-            }, cancellationToken);
         }
 
         private bool RefreshView(PreparedMarkup prepared, GameplaySetupMenu[] cohort, Queue<PreparedMarkup> cells, long currentRevision)
