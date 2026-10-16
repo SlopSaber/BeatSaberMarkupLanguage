@@ -1,4 +1,5 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project>
+  <Import Project="Sdk.props" Sdk="Microsoft.NET.Sdk" />
 
   <PropertyGroup>
     <TargetFramework>net472</TargetFramework>
@@ -15,7 +16,7 @@
     <PluginIcon>BeatSaberMarkupLanguage.Resources.icon.png</PluginIcon>
     <Copyright>Copyright © monkeymanboy 2019-2024</Copyright>
     <Description>An XML-based UI system.</Description>
-    <GameVersion>1.45.2</GameVersion>
+    <GameVersion>1.45.3</GameVersion>
     <Version>1.14.2</Version>
     <RepositoryUrl>https://github.com/monkeymanboy/BeatSaberMarkupLanguage</RepositoryUrl>
     <PluginFeatures>
@@ -187,4 +188,6 @@
       <OutputItemType>Analyzer</OutputItemType>
     </ProjectReference>
   </ItemGroup>
+  <Import Project="Sdk.targets" Sdk="Microsoft.NET.Sdk" />
+  <Import Project="..\BSIPA.Layout.targets" Condition="Exists('$(GameDirectory)\IPA\Data\Managed\IPA.Loader.dll') OR Exists('$(BeatSaberDir)\IPA\Data\Managed\IPA.Loader.dll')" />
 </Project>
