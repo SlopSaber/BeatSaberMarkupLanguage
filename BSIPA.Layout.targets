@@ -33,7 +33,7 @@
     <ItemGroup>
       <Reference Update="@(Reference)">
         <_BSIPAFile Condition="'%(Reference.HintPath)' != ''">$([System.IO.Path]::GetFileName('%(Reference.HintPath)'))</_BSIPAFile>
-        <_BSIPAFile Condition="'%(Reference.HintPath)' == ''">%(Reference.Filename).dll</_BSIPAFile>
+        <_BSIPAFile Condition="'%(Reference.HintPath)' == ''">%(Reference.Identity).dll</_BSIPAFile>
       </Reference>
       <Reference Update="@(Reference)" Condition="Exists('$(_BSIPALoader)\%(Reference._BSIPAFile)')">
         <HintPath>$(_BSIPALoader)\%(Reference._BSIPAFile)</HintPath>
