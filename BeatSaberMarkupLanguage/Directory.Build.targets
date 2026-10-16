@@ -50,6 +50,10 @@
     </ItemGroup>
   </Target>
 
+  <Target Name="RemoveObsoleteLibraryManifest" BeforeTargets="BeforeBuild" Condition="'$(BeatSaberOutputType)' != 'Library'">
+    <Delete Files="$(TargetDir)$(TargetName).manifest" />
+  </Target>
+
   <Target Name="GenerateBSMLManifest" BeforeTargets="BSMT_StartBSIPA">
     <GenerateManifest ID="$(PackageId)" Name="$(Title)" Author="$(Authors)" Version="$(Version)" GameVersion="$(GameVersion)"
                       Description="$(Description)" Icon="$(PluginIcon)" DependsOn="@(DependsOn)" ConflictsWith="@(ConflictsWith)"
