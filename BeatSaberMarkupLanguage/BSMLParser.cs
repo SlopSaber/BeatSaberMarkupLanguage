@@ -18,9 +18,6 @@ namespace BeatSaberMarkupLanguage
 {
     public class BSMLParser : ZenjectSingleton<BSMLParser>, IInitializable
     {
-        /// <summary>Raised after tag creation, before its type handlers apply attributes.</summary>
-        public static event Action<GameObject, XElement, GameObject> TagCreated;
-
         internal static readonly string MacroPrefix = "macro.";
         internal static readonly string RetrieveValuePrefix = "~";
         internal static readonly string SubscribeEventActionPrefix = "#";
@@ -49,6 +46,9 @@ namespace BeatSaberMarkupLanguage
                 RegisterTypeHandler(typeHandler);
             }
         }
+
+        /// <summary>Raised after tag creation, before its type handlers apply attributes.</summary>
+        public static event Action<GameObject, XElement, GameObject> TagCreated;
 
         public void Initialize()
         {
