@@ -18,6 +18,9 @@ namespace BeatSaberMarkupLanguage
 {
     public class BSMLParser : ZenjectSingleton<BSMLParser>, IInitializable
     {
+        /// <summary>Raised after tag creation, before its type handlers apply attributes.</summary>
+        public static event Action<GameObject, XElement, GameObject> TagCreated;
+
         internal static readonly string MacroPrefix = "macro.";
         internal static readonly string RetrieveValuePrefix = "~";
         internal static readonly string SubscribeEventActionPrefix = "#";
@@ -349,6 +352,7 @@ namespace BeatSaberMarkupLanguage
             }
 
             GameObject currentNode = currentTag.CreateObject(parent.transform);
+            TagCreated?.Invoke(currentNode, element, parent);
 
             List<ComponentTypeWithData> componentTypes = new();
             foreach (TypeHandler typeHandler in typeHandlers)
