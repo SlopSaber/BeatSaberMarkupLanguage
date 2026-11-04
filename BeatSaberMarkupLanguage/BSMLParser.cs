@@ -325,9 +325,11 @@ namespace BeatSaberMarkupLanguage
                 }
             }
 
+            // In the Editor a GetComponent miss allocates a fake-null object with an error
+            // message; tags probe many component types per node, so use TryGetComponent.
             if (component == null)
             {
-                component = gameObject.GetComponent(type);
+                gameObject.TryGetComponent(type, out component);
             }
 
             return component;
