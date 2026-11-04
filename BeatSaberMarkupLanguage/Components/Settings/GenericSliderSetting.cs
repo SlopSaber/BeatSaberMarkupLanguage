@@ -59,7 +59,12 @@ namespace BeatSaberMarkupLanguage.Components.Settings
             incButton = slider._incButton;
             decButton = slider._decButton;
 
-            if (!showButtons)
+            if (showButtons)
+            {
+                incButton.gameObject.AddComponent<SliderButtonDragBlocker>();
+                decButton.gameObject.AddComponent<SliderButtonDragBlocker>();
+            }
+            else
             {
                 slider.image.sprite = Utilities.FindSpriteCached("RoundRect10");
                 Destroy(incButton.gameObject);
