@@ -14,6 +14,13 @@ namespace BeatSaberMarkupLanguage.MenuButtons
     [ViewDefinition("BeatSaberMarkupLanguage.Views.main-left-screen.bsml")]
     internal class MenuButtonsViewController : BSMLAutomaticViewController
     {
+        private static bool applicationQuitting;
+
+        static MenuButtonsViewController()
+        {
+            UnityEngine.Application.quitting += () => applicationQuitting = true;
+        }
+
         [UIValue("buttons")]
         public IList Buttons { get; internal set; }
 
@@ -22,7 +29,7 @@ namespace BeatSaberMarkupLanguage.MenuButtons
 
         public void RefreshView()
         {
-            if (!isActivated)
+            if (!isActivated || applicationQuitting)
             {
                 return;
             }

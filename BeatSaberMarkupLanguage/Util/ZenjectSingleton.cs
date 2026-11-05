@@ -1,4 +1,5 @@
 ﻿using System;
+using Zenject;
 
 namespace BeatSaberMarkupLanguage.Util
 {
@@ -10,8 +11,16 @@ namespace BeatSaberMarkupLanguage.Util
     public abstract class ZenjectSingleton<T>
         where T : class
     {
+        private static T cachedInstance;
+        private static DiContainer cachedContainer;
+
         internal ZenjectSingleton()
         {
+            if (this is T instance && BeatSaberUI.DiContainer != null)
+            {
+                cachedInstance = instance;
+                cachedContainer = BeatSaberUI.DiContainer;
+            }
         }
 
         /// <summary>
@@ -19,6 +28,27 @@ namespace BeatSaberMarkupLanguage.Util
         /// </summary>
         /// <exception cref="InvalidOperationException">Thrown if this property is accessed when the main menu hasn't yet initialized.</exception>
         /// <remarks>If you are using Zenject, consider injecting the instance of this class directly rather than using this property.</remarks>
-        public static T Instance => BeatSaberUI.DiContainer != null && !BeatSaberUI.DiContainer.IsInstalling ? BeatSaberUI.DiContainer.Resolve<T>() : throw new InvalidOperationException($"Tried getting {typeof(T).Name} too early!");
+        public static T Instance
+        {
+            get
+            {
+                DiContainer container = BeatSaberUI.DiContainer;
+
+                if (container == null || container.IsInstalling)
+                {
+                    throw new InvalidOperationException($"Tried getting {typeof(T).Name} too early!");
+                }
+
+                // Mods unregister buttons while the game shuts down, when the container can no longer resolve.
+                if (cachedInstance != null && ReferenceEquals(cachedContainer, container))
+                {
+                    return cachedInstance;
+                }
+
+                cachedInstance = container.Resolve<T>();
+                cachedContainer = container;
+                return cachedInstance;
+            }
+        }
     }
 }
