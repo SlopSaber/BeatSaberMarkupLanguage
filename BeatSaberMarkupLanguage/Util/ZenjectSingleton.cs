@@ -16,11 +16,6 @@ namespace BeatSaberMarkupLanguage.Util
 
         internal ZenjectSingleton()
         {
-            if (this is T instance && BeatSaberUI.DiContainer != null)
-            {
-                cachedInstance = instance;
-                cachedContainer = BeatSaberUI.DiContainer;
-            }
         }
 
         /// <summary>
