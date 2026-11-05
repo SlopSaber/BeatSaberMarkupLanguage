@@ -340,19 +340,21 @@ namespace BeatSaberMarkupLanguage
                 return sprite;
             }
 
+            // Object.name allocates a new string on every read, so read it once per object.
             foreach (Sprite x in Resources.FindObjectsOfTypeAll<Sprite>())
             {
-                if (x.name.Length == 0)
+                string spriteName = x.name;
+                if (spriteName.Length == 0)
                 {
                     continue;
                 }
 
-                if (!SpriteCache.TryGetValue(x.name, out Sprite a) || a == null)
+                if (!SpriteCache.TryGetValue(spriteName, out Sprite a) || a == null)
                 {
-                    SpriteCache[x.name] = x;
+                    SpriteCache[spriteName] = x;
                 }
 
-                if (x.name == name)
+                if (spriteName == name)
                 {
                     sprite = x;
                 }
@@ -370,17 +372,18 @@ namespace BeatSaberMarkupLanguage
 
             foreach (Texture x in Resources.FindObjectsOfTypeAll<Texture>())
             {
-                if (x.name.Length == 0)
+                string textureName = x.name;
+                if (textureName.Length == 0)
                 {
                     continue;
                 }
 
-                if (!TextureCache.TryGetValue(x.name, out Texture a) || a == null)
+                if (!TextureCache.TryGetValue(textureName, out Texture a) || a == null)
                 {
-                    TextureCache[x.name] = x;
+                    TextureCache[textureName] = x;
                 }
 
-                if (x.name == name)
+                if (textureName == name)
                 {
                     texture = x;
                 }
